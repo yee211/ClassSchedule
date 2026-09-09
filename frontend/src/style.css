@@ -922,7 +922,7 @@ html[data-bg="frosted"] .ambient-canvas {
   flex: 1;
 }
 
-.modal-actions button, .suggestions button {
+.modal-actions button {
   border: 1px solid rgba(255, 255, 255, 0.75);
   border-radius: 14px;
   padding: 11px 18px;
@@ -988,28 +988,19 @@ html[data-bg="frosted"] .ambient-canvas {
   to { transform: rotate(360deg); }
 }
 
-.suggestions > p, .empty {
+.empty {
   color: #64748b;
   font-size: 0.9rem;
-}
-
-.suggestions button {
-  width: 100%;
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin: 8px 0;
-  text-align: left;
-  padding: 12px 16px;
-}
-
-.suggestions b {
-  color: #38bdf8;
-}
-
-.empty {
   padding: 44px 8px;
   text-align: center;
+}
+
+.empty small {
+  display: block;
+  margin-top: 10px;
+  color: #94a3b8;
+  font-size: 0.76rem;
+  word-break: break-all;
 }
 
 /* Toast 提示条 */

@@ -1,0 +1,91 @@
+import json
+import shutil
+import uuid
+from datetime import date
+from pathlib import Path
+
+from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile
+
+from ..ai import parse_with_ai
+from ..auth import get_current_user
+from ..db import DATA, connect
+from ..parser import parse_excel_schedule
+
+router = APIRouter(prefix="/api", tags=["import"])
+
+UPLOADS = DATA / "uploads"
+UPLOADS.mkdir(parents=True, exist_ok=True)
+
+
+def parse_schedule_date(value: str, label: str):
+    value = (value or "").strip()
+    if not value:
+        return None
+    try:
+        return date.fromisoformat(value)
+    except ValueError as error:
+        raise HTTPException(400, f"{label}格式应为 YYYY-MM-DD") from error
+
+
+@router.post("/import")
+def import_file(
+    file: UploadFile = File(...),
+    start_date: str = Form(""),
+    end_date: str = Form(""),
+    user=Depends(get_current_user),
+):
+    """上传 Excel 课表文件（.xlsx / .xlsm / .xls），优先由 AI 提取，失败时自动回退本地解析。"""
+    schedule_start = parse_schedule_date(start_date, "学期开始日期")
+    schedule_end = parse_schedule_date(end_date, "学期结束日期")
+    if schedule_start and schedule_end and schedule_end < schedule_start:
+        raise HTTPException(400, "学期结束日期不能早于开始日期")
+    suffix = Path(file.filename or "").suffix.lower()
+    if suffix not in {".xlsx", ".xlsm", ".xls"}:
+        raise HTTPException(400, "仅支持 Excel 课表（.xlsx / .xlsm / .xls）")
+    target = UPLOADS / f"{uuid.uuid4().hex}{suffix}"
+    try:
+        with target.open("wb") as out:
+            shutil.copyfileobj(file.file, out)
+        parsed, engine = parse_with_ai(target)
+        if not parsed:
+            # AI 未配置、超时或识别失败时静默回退到确定性解析，保证导入功能不中断
+            try:
+                parsed = parse_excel_schedule(target)
+            except Exception:
+                parsed = None
+            engine = f"excel-fallback({engine})"
+        if not parsed:
+            # 带上引擎标记，便于用户与运维分辨到底是 AI 未配置还是文件本身无法识别
+            raise HTTPException(422, f"AI 与本地解析均未能从该 Excel 中识别出课程（{engine}），请确认文件包含课程明细")
+
+        with connect() as db:
+            db.execute("SELECT pg_advisory_xact_lock(hashtext(%s))", (f"{user['id']}|{parsed['term']}",))
+            schedule = db.execute(
+                "SELECT * FROM schedules WHERE user_id=%s AND term=%s ORDER BY id DESC LIMIT 1 FOR UPDATE",
+                (user["id"], parsed["term"]),
+            ).fetchone()
+            replaced = schedule is not None
+            if schedule:
+                schedule = db.execute(
+                    """UPDATE schedules SET name=%s,start_date=%s,end_date=%s
+                    WHERE id=%s RETURNING *""",
+                    (parsed["name"], schedule_start, schedule_end, schedule["id"]),
+                ).fetchone()
+                db.execute("DELETE FROM courses WHERE schedule_id=%s", (schedule["id"],))
+            else:
+                schedule = db.execute(
+                    "INSERT INTO schedules(user_id,name,term,start_date,end_date) VALUES(%s,%s,%s,%s,%s) RETURNING *",
+                    (user["id"], parsed["name"], parsed["term"], schedule_start, schedule_end),
+                ).fetchone()
+            rows = [(
+                schedule["id"], course["name"], course["teacher"], course["room"], course["weekday"],
+                course["start_section"], course["end_section"], json.dumps(course["weeks"]), course["color"],
+            ) for course in parsed["courses"]]
+            with db.cursor() as cursor:
+                cursor.executemany("""INSERT INTO courses
+                    (schedule_id,name,teacher,room,weekday,start_section,end_section,weeks,color)
+                    VALUES(%s,%s,%s,%s,%s,%s,%s,%s::jsonb,%s)""", rows)
+        return {"engine": engine, "imported": len(rows), "schedule_id": schedule["id"], "replaced": replaced}
+    finally:
+        # 上传文件仅用于本次解析，用完即删，避免 data/uploads 无限堆积
+        target.unlink(missing_ok=True)

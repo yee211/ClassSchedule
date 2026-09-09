@@ -1,289 +1,422 @@
 <script setup>
-import { computed, onMounted, onUnmounted, reactive, ref } from 'vue'
+import { computed, onMounted, onUnmounted, reactive, ref } from 'vue';
+import {
+  authApi,
+  clearAuth,
+  coursesApi,
+  getActiveScheduleId,
+  getToken,
+  importerApi,
+  schedulesApi,
+  setActiveScheduleId,
+  setToken,
+} from './api/index.js';
+import {
+  buildCourseColorMap,
+  defaultEndDate,
+  emptyCourse,
+  formatWeeks,
+  parseWeeks,
+  scheduleWeekCount,
+  termWeek,
+} from './utils/schedule.js';
 
-const days = ['周一','周二','周三','周四','周五','周六','周日']
-const sectionTimes = [
-  ['08:20','09:05'],['09:15','10:00'],['10:20','11:05'],['11:15','12:00'],['14:00','14:45'],
-  ['14:55','15:40'],['16:00','16:45'],['16:55','17:40'],['19:00','19:45'],['19:55','20:40'],
-]
-// 颜色按色相大幅错开，避免相邻课程看起来过于接近。
-const courseColors = [
-  '#2563EB','#DC2626','#059669','#D97706','#7C3AED','#DB2777','#0891B2','#65A30D',
-  '#4F46E5','#EA580C','#0F766E','#B91C1C','#9333EA','#0E7490','#CA8A04','#BE185D',
-  '#1D4ED8','#15803D','#C2410C','#86198F','#0369A1','#A16207',
-]
-const week = ref(1), currentWeek = ref(1), schedules = ref([]), schedule = ref(null), loading = ref(true), message = ref('')
-const editorOpen = ref(false), previewOpen = ref(false), previewCourse = ref(null), importerOpen = ref(false), importing = ref(false), importSetup = ref(false), importFile = ref(null), suggestions = ref([]), importError = ref('')
-const importStartDate = ref(''), importEndDate = ref('')
-const weekMenuOpen = ref(false)
-const weekOptions = computed(() => Array.from({length:scheduleWeekCount()}, (_, index) => index + 1))
-const emptyCourse = () => ({id:null,name:'',teacher:'',room:'',weekday:1,start_section:1,end_section:2,weeks:'1-16',color:'#5B8DEF'})
-const form = reactive(emptyCourse())
-const activeCourses = computed(() => schedule.value?.courses.filter(c => !c.weeks?.length || c.weeks.includes(week.value)) || [])
-const displayCourses = computed(() => {
-  const result=[]
-  for(const course of [...activeCourses.value].sort((a,b)=>a.weekday-b.weekday||a.start_section-b.start_section)){
-    const previous=result[result.length-1]
-    const canMerge=previous && courseKey(previous.name)===courseKey(course.name)
-      && previous.teacher===course.teacher && previous.room===course.room
-      && previous.weekday===course.weekday && previous.end_section+1===course.start_section
-    if(canMerge)previous.end_section=course.end_section
-    else result.push({...course})
-  }
-  return result
-})
+import HeaderBar from './components/HeaderBar.vue';
+import ScheduleToolbar from './components/ScheduleToolbar.vue';
+import ScheduleGrid from './components/ScheduleGrid.vue';
+import CoursePreviewModal from './components/CoursePreviewModal.vue';
+import CourseEditorModal from './components/CourseEditorModal.vue';
+import ImporterModal from './components/ImporterModal.vue';
+import AuthModal from './components/AuthModal.vue';
 
-function notify(text){ message.value=text; window.clearTimeout(notify.timer); notify.timer=window.setTimeout(()=>message.value='',2200) }
-function parseWeeks(text){
-  const result=[]
-  String(text).split(/[,，]/).forEach(part=>{const [a,b]=part.trim().split('-').map(Number); if(a&&b){for(let i=a;i<=b;i++)result.push(i)}else if(a)result.push(a)})
-  return [...new Set(result)].filter(n=>n>=1&&n<=30).sort((a,b)=>a-b)
+// 基础状态
+const week = ref(1);
+const currentWeek = ref(1);
+const schedules = ref([]);
+const schedule = ref(null);
+const loading = ref(true);
+const message = ref('');
+
+// 用户认证状态
+const user = ref(null);
+const authMode = ref('login');
+const authError = ref('');
+const authLoading = ref(false);
+const authForm = reactive({ email: '', username: '', password: '' });
+
+// 弹窗状态
+const previewOpen = ref(false);
+const previewCourse = ref(null);
+
+const editorOpen = ref(false);
+const form = reactive(emptyCourse());
+
+const importerOpen = ref(false);
+const importing = ref(false);
+const importSetup = ref(false);
+const importFile = ref(null);
+const importError = ref('');
+const importEngine = ref('');
+const importStartDate = ref('');
+const importEndDate = ref('');
+
+// 计算属性
+const weekOptions = computed(() =>
+  Array.from({ length: scheduleWeekCount(schedule.value) }, (_, index) => index + 1)
+);
+
+const courseColorMap = computed(() => buildCourseColorMap(schedule.value?.courses));
+
+// 提示消息
+function notify(text) {
+  message.value = text;
+  window.clearTimeout(notify.timer);
+  notify.timer = window.setTimeout(() => {
+    message.value = '';
+  }, 2200);
 }
-function formatWeeks(weeks){
-  if(!weeks?.length) return ''
-  const ranges=[]; let start=weeks[0], last=start
-  for(const n of weeks.slice(1)){if(n===last+1){last=n;continue} ranges.push(start===last?`${start}`:`${start}-${last}`);start=last=n}
-  ranges.push(start===last?`${start}`:`${start}-${last}`); return ranges.join(',')
+
+// 登出
+function logout() {
+  clearAuth();
+  user.value = null;
+  schedule.value = null;
+  schedules.value = [];
+  loading.value = false;
 }
-async function api(url, options){
-  const response=await fetch(url,options); if(!response.ok){let body={};try{body=await response.json()}catch{};throw new Error(body.detail||'请求失败')}
-  return response.status===204?null:response.json()
-}
-async function load(preferredId=schedule.value?.id){
-  try{
-    const list=await api('/api/schedules'); schedules.value=list
-    const savedId=Number(localStorage.getItem('active_schedule_id'))
-    schedule.value=list.find(item=>item.id===Number(preferredId)) || list.find(item=>item.id===savedId) || list[0] || null
-    if(schedule.value)localStorage.setItem('active_schedule_id',schedule.value.id)
-    currentWeek.value=termWeek(schedule.value?.start_date);week.value=currentWeek.value
+
+// 登录 / 注册提交
+async function submitAuth() {
+  authError.value = '';
+  const isRegister = authMode.value === 'register';
+  const email = authForm.email.trim();
+  const username = authForm.username.trim();
+
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+    authError.value = '请输入有效的邮箱地址';
+    return;
   }
-  catch(error){notify(error.message)} finally{loading.value=false}
-}
-function selectSchedule(event){
-  schedule.value=schedules.value.find(item=>item.id===Number(event.target.value)) || null
-  if(schedule.value)localStorage.setItem('active_schedule_id',schedule.value.id)
-  currentWeek.value=termWeek(schedule.value?.start_date);week.value=currentWeek.value;weekMenuOpen.value=false
-}
-async function deleteSchedule(){
-  const current=schedule.value
-  if(!current)return
-  const title=current.term || current.name || '当前课表'
-  if(!confirm(`确认删除“${title}”？该课表中的全部课程也会被删除。`))return
-  try{
-    await api(`/api/schedules/${current.id}`,{method:'DELETE'})
-    localStorage.removeItem('active_schedule_id')
-    await load(null);notify('课表已删除')
-  }catch(error){notify(error.message)}
-}
-function termWeek(startDate){
-  if(!startDate)return 1
-  const start=new Date(`${startDate}T00:00:00`), today=new Date();
-  const elapsed=Math.floor((today-start)/86400000)
-  return Math.max(1,Math.min(scheduleWeekCount(),Math.floor(elapsed/7)+1))
-}
-function localDate(value){
-  const [year,month,day]=String(value || '').slice(0,10).split('-').map(Number)
-  return year&&month&&day ? new Date(year,month-1,day) : null
-}
-function scheduleWeekCount(){
-  const start=localDate(schedule.value?.start_date), end=localDate(schedule.value?.end_date)
-  if(start&&end){
-    const days=Math.floor((end-start)/86400000)+1
-    return Math.max(1,Math.min(30,Math.ceil(days/7)))
+  if (isRegister && username.length < 2) {
+    authError.value = '用户名至少需要 2 个字符';
+    return;
   }
-  const courseWeeks=schedule.value?.courses?.flatMap(course => course.weeks || []) || []
-  return Math.min(30, Math.max(20, ...courseWeeks, 20))
+  if (authForm.password.length < 6) {
+    authError.value = '密码至少需要 6 个字符';
+    return;
+  }
+
+  authLoading.value = true;
+  try {
+    const payload = isRegister
+      ? { email, username, password: authForm.password }
+      : { email, password: authForm.password };
+    const result = isRegister ? await authApi.register(payload) : await authApi.login(payload);
+
+    setToken(result.token);
+    user.value = result.user;
+    authForm.password = '';
+    await load();
+    notify(isRegister ? '注册成功，欢迎加入' : '欢迎回来');
+  } catch (error) {
+    authError.value = error.message;
+  } finally {
+    authLoading.value = false;
+  }
 }
-function isoDate(date){
-  return `${date.getFullYear()}-${String(date.getMonth()+1).padStart(2,'0')}-${String(date.getDate()).padStart(2,'0')}`
+
+// 加载课表列表
+async function load(preferredId = schedule.value?.id) {
+  try {
+    const list = await schedulesApi.list();
+    schedules.value = list;
+    const savedId = getActiveScheduleId();
+    schedule.value = list.find(item => item.id === Number(preferredId))
+      || list.find(item => item.id === savedId)
+      || list[0]
+      || null;
+
+    if (schedule.value) {
+      setActiveScheduleId(schedule.value.id);
+    }
+    const totalWeeks = scheduleWeekCount(schedule.value);
+    currentWeek.value = termWeek(schedule.value?.start_date, totalWeeks);
+    week.value = currentWeek.value;
+  } catch (error) {
+    notify(error.message);
+  } finally {
+    loading.value = false;
+  }
 }
-function defaultEndDate(startValue){
-  const start=localDate(startValue); if(!start)return ''
-  start.setDate(start.getDate()+20*7-1); return isoDate(start)
+
+// 切换当前课表
+function selectSchedule(event) {
+  schedule.value = schedules.value.find(item => item.id === Number(event.target.value)) || null;
+  if (schedule.value) {
+    setActiveScheduleId(schedule.value.id);
+  }
+  const totalWeeks = scheduleWeekCount(schedule.value);
+  currentWeek.value = termWeek(schedule.value?.start_date, totalWeeks);
+  week.value = currentWeek.value;
 }
-function weekRange(weekNumber){
-  const start=localDate(schedule.value?.start_date)
-  if(!start)return '日期待设置'
-  start.setDate(start.getDate()+(weekNumber-1)*7)
-  const end=new Date(start);end.setDate(end.getDate()+6)
-  const format=date=>`${String(date.getMonth()+1).padStart(2,'0')}.${String(date.getDate()).padStart(2,'0')}`
-  return `${format(start)}–${format(end)}`
+
+// 删除课表
+async function deleteSchedule() {
+  const current = schedule.value;
+  if (!current) return;
+  const title = current.term || current.name || '当前课表';
+  if (!confirm(`确认删除“${title}”？该课表中的全部课程也会被删除。`)) return;
+  try {
+    await schedulesApi.delete(current.id);
+    setActiveScheduleId(null);
+    await load(null);
+    notify('课表已删除');
+  } catch (error) {
+    notify(error.message);
+  }
 }
-function weekDayDate(dayNumber, weekNumber){
-  const start=localDate(schedule.value?.start_date)
-  if(!start)return '日期待设置'
-  start.setDate(start.getDate()+(weekNumber-1)*7+dayNumber-1)
-  return `${String(start.getMonth()+1).padStart(2,'0')}.${String(start.getDate()).padStart(2,'0')}`
+
+function goCurrentWeek() {
+  week.value = currentWeek.value;
 }
-function selectWeek(value){week.value=value;weekMenuOpen.value=false}
-function goCurrentWeek(){week.value=currentWeek.value;weekMenuOpen.value=false}
-function toggleWeekMenu(){weekMenuOpen.value=!weekMenuOpen.value}
-function closeWeekMenu(event){if(!event.target.closest('.week-menu'))weekMenuOpen.value=false}
-function openPreview(course){previewCourse.value=course;previewOpen.value=true}
-function editPreview(){const course=previewCourse.value;previewOpen.value=false;openEditor(course)}
-function openEditor(course){Object.assign(form,emptyCourse(),course||{});form.weeks=formatWeeks(course?.weeks)||'1-16';editorOpen.value=true}
-async function save(){
-  const payload={schedule_id:schedule.value.id,name:form.name.trim(),teacher:form.teacher.trim(),room:form.room.trim(),weekday:+form.weekday,start_section:+form.start_section,end_section:+form.end_section,weeks:parseWeeks(form.weeks),color:form.color}
-  if(payload.end_section<payload.start_section)return notify('结束节次不能早于开始节次')
-  try{await api(form.id?`/api/courses/${form.id}`:'/api/courses',{method:form.id?'PUT':'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)});editorOpen.value=false;notify('课程已保存');await load()}catch(error){notify(error.message)}
+
+// 课程详情预览与编辑跳转
+function openPreview(course) {
+  previewCourse.value = course;
+  previewOpen.value = true;
 }
-async function remove(){if(!form.id||!confirm('确认删除这门课程？'))return;try{await api(`/api/courses/${form.id}`,{method:'DELETE'});editorOpen.value=false;notify('课程已删除');await load()}catch(error){notify(error.message)}}
-function upload(event){
-  const file=event.target.files[0];event.target.value='';if(!file)return
-  importerOpen.value=true;importing.value=false;importSetup.value=true;importFile.value=file;suggestions.value=[];importError.value=''
-  importStartDate.value=schedule.value?.start_date?.slice(0,10) || ''
-  importEndDate.value=schedule.value?.end_date?.slice(0,10) || defaultEndDate(importStartDate.value)
+
+function editPreview(course) {
+  previewOpen.value = false;
+  openEditor(course);
 }
-async function startImport(){
-  if(!importFile.value)return
-  if(!importStartDate.value || !importEndDate.value){importError.value='请先填写学期开始日期和结束日期';return}
-  if(importEndDate.value<importStartDate.value){importError.value='学期结束日期不能早于开始日期';return}
-  importSetup.value=false;importing.value=true;importError.value=''
-  const body=new FormData();body.append('file',importFile.value);body.append('start_date',importStartDate.value);body.append('end_date',importEndDate.value)
-  try{const result=await api('/api/import',{method:'POST',body});if(result.imported){importerOpen.value=false;await load(result.schedule_id);notify(result.replaced?`已覆盖当前学期，共 ${result.imported} 条课程安排`:`已导入 ${result.imported} 条课程安排`)}else{suggestions.value=result.suggestions;notify(result.engine==='ocr-not-installed'?'文件已上传，请安装 OCR 扩展':'识别完成')}}
-  catch(error){importError.value=error.message;notify(error.message)}finally{importing.value=false}
+
+function openEditor(course) {
+  Object.assign(form, emptyCourse(), course || {});
+  form.weeks = formatWeeks(course?.weeks) || '1-16';
+  editorOpen.value = true;
 }
-function editSuggestion(course){importerOpen.value=false;openEditor(course)}
-function courseKey(name){return String(name||'未命名课程').trim().replace(/\s+/g,' ').toLocaleLowerCase()}
-const courseColorMap = computed(() => {
-  const names=[...new Set((schedule.value?.courses||[]).map(course=>courseKey(course.name)))].sort()
-  return new Map(names.map((name,index)=>[name,courseColors[index%courseColors.length]]))
-})
-function courseColor(name){return courseColorMap.value.get(courseKey(name))||courseColors[0]}
-function courseStyle(course){return {gridColumn:`${course.weekday+1}`,gridRow:`${course.start_section+1}/${course.end_section+2}`,'--course':courseColor(course.name)}}
-function timeRange(course){return `${sectionTimes[course.start_section-1]?.[0]||''}-${sectionTimes[course.end_section-1]?.[1]||''}`}
-const savedBgMode = localStorage.getItem('schedule_bg_mode')
-const bgMode = ref(savedBgMode === 'night' ? 'night' : 'transparent')
-function toggleNightMode(){
-  bgMode.value = bgMode.value === 'night' ? 'transparent' : 'night'
-  document.documentElement.setAttribute('data-bg', bgMode.value)
-  localStorage.setItem('schedule_bg_mode', bgMode.value)
-  notify(bgMode.value === 'night' ? '已开启黑夜模式' : '已关闭黑夜模式')
+
+// 保存课程
+async function saveCourse() {
+  const payload = {
+    schedule_id: schedule.value.id,
+    name: form.name.trim(),
+    teacher: form.teacher.trim(),
+    room: form.room.trim(),
+    weekday: +form.weekday,
+    start_section: +form.start_section,
+    end_section: +form.end_section,
+    weeks: parseWeeks(form.weeks),
+    color: form.color,
+  };
+  if (payload.end_section < payload.start_section) {
+    notify('结束节次不能早于开始节次');
+    return;
+  }
+  try {
+    if (form.id) {
+      await coursesApi.update(form.id, payload);
+    } else {
+      await coursesApi.add(payload);
+    }
+    editorOpen.value = false;
+    notify('课程已保存');
+    await load();
+  } catch (error) {
+    notify(error.message);
+  }
 }
-onMounted(()=>{
-  document.documentElement.setAttribute('data-bg', bgMode.value)
-  load()
-  document.addEventListener('click',closeWeekMenu)
-})
-onUnmounted(()=>document.removeEventListener('click',closeWeekMenu))
+
+// 删除课程
+async function removeCourse() {
+  if (!form.id || !confirm('确认删除这门课程？')) return;
+  try {
+    await coursesApi.delete(form.id);
+    editorOpen.value = false;
+    notify('课程已删除');
+    await load();
+  } catch (error) {
+    notify(error.message);
+  }
+}
+
+// 上传与导入向导
+function upload(event) {
+  const file = event.target.files[0];
+  event.target.value = '';
+  if (!file) return;
+  importerOpen.value = true;
+  importing.value = false;
+  importSetup.value = true;
+  importFile.value = file;
+  importError.value = '';
+  importEngine.value = '';
+  importStartDate.value = schedule.value?.start_date?.slice(0, 10) || '';
+  importEndDate.value = schedule.value?.end_date?.slice(0, 10) || defaultEndDate(importStartDate.value);
+}
+
+async function startImport() {
+  if (!importFile.value) return;
+  if (!importStartDate.value || !importEndDate.value) {
+    importError.value = '请先填写学期开始日期和结束日期';
+    return;
+  }
+  if (importEndDate.value < importStartDate.value) {
+    importError.value = '学期结束日期不能早于开始日期';
+    return;
+  }
+  importSetup.value = false;
+  importing.value = true;
+  importError.value = '';
+  const body = new FormData();
+  body.append('file', importFile.value);
+  body.append('start_date', importStartDate.value);
+  body.append('end_date', importEndDate.value);
+
+  try {
+    const result = await importerApi.importFile(body);
+    importEngine.value = result.engine || '';
+    if (result.imported) {
+      importerOpen.value = false;
+      await load(result.schedule_id);
+      notify(result.replaced ? `已覆盖当前学期，共 ${result.imported} 条课程安排` : `已导入 ${result.imported} 条课程安排`);
+    }
+  } catch (error) {
+    importError.value = error.message;
+    notify(error.message);
+  } finally {
+    importing.value = false;
+  }
+}
+
+// 日夜模式
+const savedBgMode = localStorage.getItem('schedule_bg_mode');
+const bgMode = ref(savedBgMode === 'night' ? 'night' : 'transparent');
+
+function toggleNightMode() {
+  bgMode.value = bgMode.value === 'night' ? 'transparent' : 'night';
+  document.documentElement.setAttribute('data-bg', bgMode.value);
+  localStorage.setItem('schedule_bg_mode', bgMode.value);
+  notify(bgMode.value === 'night' ? '已开启黑夜模式' : '已关闭黑夜模式');
+}
+
+// 生命周期
+onMounted(async () => {
+  document.documentElement.setAttribute('data-bg', bgMode.value);
+  window.addEventListener('auth:expired', logout);
+  if (getToken()) {
+    try {
+      user.value = await authApi.me();
+      await load();
+    } catch {
+      logout();
+    }
+  } else {
+    loading.value = false;
+  }
+});
+
+onUnmounted(() => {
+  window.removeEventListener('auth:expired', logout);
+});
 </script>
 
 <template>
-  <iframe class="wallpaper-background" src="/wallpaper/index.html" title="动态壁纸背景" aria-hidden="true" tabindex="-1"></iframe>
+  <iframe
+    class="wallpaper-background"
+    src="/wallpaper/index.html"
+    title="动态壁纸背景"
+    aria-hidden="true"
+    tabindex="-1"
+  ></iframe>
   <div class="ambient-canvas" aria-hidden="true">
     <div class="blob blob-1"></div>
     <div class="blob blob-2"></div>
     <div class="blob blob-3"></div>
     <div class="blob blob-4"></div>
   </div>
-  <main class="shell">
-    <header class="top glass">
-      <div><span class="brand-dot"></span><strong>简课</strong></div>
-      <div class="top-actions">
-        <button class="header-action delete-schedule uiverse-button" type="button" :disabled="!schedule" @click="deleteSchedule"><span aria-hidden="true">−</span> 删除课表</button>
-        <button class="header-action uiverse-button" type="button" @click="openEditor()"><span aria-hidden="true">＋</span> 添加课程</button>
-        <label class="header-action upload uiverse-button"><input type="file" accept=".pdf,.xlsx,.xlsm,.png,.jpg,.jpeg,.webp" @change="upload"><span aria-hidden="true">↑</span> 上传课表</label>
-        <button type="button" class="night-mode-button" :class="{ active: bgMode === 'night' }" :aria-label="bgMode === 'night' ? '切换到日间模式' : '切换到黑夜模式'" :title="bgMode === 'night' ? '日间模式' : '黑夜模式'" :aria-pressed="bgMode === 'night'" @click="toggleNightMode">
-          <span aria-hidden="true">{{ bgMode === 'night' ? '☀️' : '🌙' }}</span>
-        </button>
-      </div>
-    </header>
 
-    <section class="toolbar glass" aria-label="课表控制">
-      <div class="term-picker">
-        <p>当前学期</p>
-        <label v-if="schedules.length > 1" class="term-select-wrap">
-          <span class="sr-only">切换学期</span>
-          <select :value="schedule?.id" aria-label="切换学期" @change="selectSchedule">
-            <option v-for="item in schedules" :key="item.id" :value="item.id">{{ item.term || item.name || `课表 ${item.id}` }}</option>
-          </select>
-          <i aria-hidden="true">⌄</i>
-        </label>
-        <h1 v-else>{{ schedule?.term || '我的课表' }}</h1>
-      </div>
-      <div class="week-picker">
-        <button class="week-nav" aria-label="上一周" @click="week=Math.max(1,week-1)">‹</button>
-        <div class="week-menu" @click.stop>
-          <button class="week-trigger" :aria-expanded="weekMenuOpen" aria-haspopup="listbox" @click="toggleWeekMenu">
-            <span><b>第{{ week }}周</b><small>{{ weekRange(week) }}</small></span><i :class="{open:weekMenuOpen}">⌄</i>
-          </button>
-          <div v-if="weekMenuOpen" class="week-menu-panel glass" role="listbox" aria-label="选择周次">
-            <div class="week-menu-head"><b>选择周次</b><button type="button" @click="goCurrentWeek">回到本周</button></div>
-            <div class="week-menu-grid">
-              <button v-for="item in weekOptions" :key="item" type="button" class="week-option" :class="{selected:week===item}" :aria-selected="week===item" @click="selectWeek(item)">
-                <b>第{{ item }}周</b><small>{{ weekRange(item) }}</small>
-              </button>
-            </div>
-          </div>
-        </div>
-        <button class="reset-week" :class="{active:week!==currentWeek}" @click="goCurrentWeek">{{ week===currentWeek?'本周':'回到本周' }}</button>
-        <button class="week-nav" aria-label="下一周" @click="week=Math.min(weekOptions.length,week+1)">›</button>
-      </div>
-    </section>
+  <main class="shell" v-if="user">
+    <HeaderBar
+      :user="user"
+      :schedule="schedule"
+      :bg-mode="bgMode"
+      @delete-schedule="deleteSchedule"
+      @add-course="openEditor()"
+      @upload="upload"
+      @logout="logout"
+      @toggle-night-mode="toggleNightMode"
+    />
 
-    <section class="schedule glass" :class="{busy:loading}">
-      <div v-if="loading" class="state">正在读取课表…</div>
-      <div v-else-if="!schedule" class="state">还没有课表</div>
-      <div v-else class="grid" style="grid-template-rows:64px repeat(10,78px)">
-        <div class="corner">节次</div>
-        <div v-for="(day,index) in days" :key="day" class="day"><b>{{ day }}</b><span>{{ weekDayDate(index+1,week) }}</span></div>
-        <template v-for="section in 10" :key="section">
-          <div class="section" :style="{gridColumn:1,gridRow:section+1}"><b>{{ section }}</b><span>{{ sectionTimes[section-1][0] }}<br>{{ sectionTimes[section-1][1] }}</span></div>
-          <div v-for="day in 7" :key="day" class="cell" :style="{gridColumn:day+1,gridRow:section+1}"></div>
-        </template>
-        <button v-for="course in displayCourses" :key="course.id" class="course" :style="courseStyle(course)" @click="openPreview(course)">
-          <b>{{ course.name }}</b><span>{{ course.room }} · {{ course.teacher }}</span><small>{{ timeRange(course) }}</small>
-        </button>
-      </div>
-    </section>
+    <ScheduleToolbar
+      :schedules="schedules"
+      :schedule="schedule"
+      :week="week"
+      :current-week="currentWeek"
+      :week-options="weekOptions"
+      @update:week="week = $event"
+      @select-schedule="selectSchedule"
+      @go-current-week="goCurrentWeek"
+    />
+
+    <ScheduleGrid
+      :schedule="schedule"
+      :week="week"
+      :loading="loading"
+      :color-map="courseColorMap"
+      @preview-course="openPreview"
+    />
   </main>
 
-  <div v-if="previewOpen" class="backdrop" @click.self="previewOpen=false">
-    <section class="modal preview-modal">
-      <div class="modal-head"><div><p>课程详情</p><h2>{{ previewCourse?.name }}</h2></div><button type="button" class="icon" @click="previewOpen=false">×</button></div>
-      <div class="preview-details">
-        <div><span>教师</span><b>{{ previewCourse?.teacher || '未填写' }}</b></div>
-        <div><span>教室</span><b>{{ previewCourse?.room || '未填写' }}</b></div>
-        <div><span>上课时间</span><b>{{ days[(previewCourse?.weekday || 1)-1] }} · {{ timeRange(previewCourse || {}) }}</b></div>
-        <div><span>上课周次</span><b>{{ formatWeeks(previewCourse?.weeks) || '每周' }}</b></div>
-        <div><span>课程颜色</span><b class="color-preview"><i :style="{background:courseColor(previewCourse?.name)}"></i>{{ courseColor(previewCourse?.name) }}</b></div>
-      </div>
-      <div class="modal-actions"><span></span><button class="uiverse-button" type="button" @click="previewOpen=false">关闭</button><button class="primary uiverse-button" type="button" @click="editPreview">编辑</button></div>
-    </section>
-  </div>
+  <!-- 登录 / 注册模态弹窗 -->
+  <AuthModal
+    :open="!user"
+    :auth-mode="authMode"
+    :auth-form="authForm"
+    :auth-error="authError"
+    :auth-loading="authLoading"
+    @submit="submitAuth"
+    @update:auth-mode="authMode = $event"
+    @clear-error="authError = ''"
+  />
 
-  <div v-if="editorOpen" class="backdrop" @click.self="editorOpen=false">
-    <form class="modal" @submit.prevent="save">
-      <div class="modal-head"><div><p>{{ form.id?'调整课程':'新建课程' }}</p><h2>{{ form.id?'编辑课程':'添加到课表' }}</h2></div><button type="button" class="icon" @click="editorOpen=false">×</button></div>
-      <label>课程名称<input v-model="form.name" required maxlength="80" placeholder="例如：计算机网络"></label>
-      <div class="fields"><label>教师<input v-model="form.teacher" maxlength="40" placeholder="选填"></label><label>教室<input v-model="form.room" maxlength="40" placeholder="选填"></label></div>
-      <div class="fields three"><label>星期<select v-model="form.weekday"><option v-for="(day,i) in days" :value="i+1">{{ day }}</option></select></label><label>开始<select v-model="form.start_section"><option v-for="n in 10" :value="n">第{{ n }}节</option></select></label><label>结束<select v-model="form.end_section"><option v-for="n in 10" :value="n">第{{ n }}节</option></select></label></div>
-      <label>上课周次<input v-model="form.weeks" placeholder="1-16，或 1,3,5"></label>
-      <label>课程颜色<input v-model="form.color" class="color" type="color"></label>
-      <div class="modal-actions"><button v-if="form.id" type="button" class="danger uiverse-button" @click="remove">删除</button><span></span><button class="uiverse-button" type="button" @click="editorOpen=false">取消</button><button class="primary uiverse-button">保存</button></div>
-    </form>
-  </div>
+  <!-- 课程预览模态弹窗 -->
+  <CoursePreviewModal
+    :open="previewOpen"
+    :course="previewCourse"
+    :color-map="courseColorMap"
+    @close="previewOpen = false"
+    @edit="editPreview"
+  />
 
-  <div v-if="importerOpen" class="backdrop" @click.self="importerOpen=false">
-    <section class="modal">
-      <div class="modal-head"><div><p>导入课表</p><h2>{{ importing?'正在识别':importSetup?'设置学期日期':'确认识别结果' }}</h2></div><button class="icon" @click="importerOpen=false">×</button></div>
-      <div v-if="importing" class="scanner"><i></i><span>正在读取课程信息…</span></div>
-      <div v-else-if="importSetup" class="import-setup">
-        <p class="import-file">已选择：{{ importFile?.name }}</p>
-        <div class="fields">
-          <label>学期开始日期<input v-model="importStartDate" type="date" required></label>
-          <label>学期结束日期<input v-model="importEndDate" type="date" required></label>
-        </div>
-        <p v-if="importError" class="import-inline-error">{{ importError }}</p>
-        <p class="import-help">系统会根据开始日期和结束日期，自动推算每周日期；课表上方会显示当前周每天的日期。</p>
-        <div class="modal-actions"><span></span><button class="uiverse-button" type="button" @click="importerOpen=false">取消</button><button type="button" class="primary uiverse-button" @click="startImport">开始识别</button></div>
-      </div>
-      <div v-else-if="importError" class="empty error">{{ importError }}</div>
-      <div v-else-if="suggestions.length" class="suggestions"><p>选择一门候选课程，确认时间后保存</p><button v-for="course in suggestions" class="uiverse-button" @click="editSuggestion(course)"><span>{{ course.name }}</span><b>添加 ›</b></button></div>
-      <div v-else class="empty">没有识别到课程，请手动添加或安装 OCR 扩展。</div>
-    </section>
-  </div>
-  <Transition name="toast"><div v-if="message" class="toast">{{ message }}</div></Transition>
+  <!-- 课程编辑 / 新建模态弹窗 -->
+  <CourseEditorModal
+    :open="editorOpen"
+    :form="form"
+    @close="editorOpen = false"
+    @save="saveCourse"
+    @delete="removeCourse"
+  />
+
+  <!-- 课表导入向导模态弹窗 -->
+  <ImporterModal
+    :open="importerOpen"
+    :importing="importing"
+    :import-setup="importSetup"
+    :import-file="importFile"
+    :import-start-date="importStartDate"
+    :import-end-date="importEndDate"
+    :import-error="importError"
+    :import-engine="importEngine"
+    @close="importerOpen = false"
+    @update:import-start-date="importStartDate = $event"
+    @update:import-end-date="importEndDate = $event"
+    @start-import="startImport"
+  />
+
+  <Transition name="toast">
+    <div v-if="message" class="toast">{{ message }}</div>
+  </Transition>
 </template>
 
 <style>
@@ -510,6 +643,10 @@ html[data-bg="night"] .term-select-wrap i {
   box-shadow: 0 2px 8px rgba(50, 75, 110, 0.06), inset 0 1px 0.5px #fff;
   cursor: pointer;
   transition: all 0.2s cubic-bezier(0.34, 1.56, 0.64, 1);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  white-space: nowrap;
 }
 
 .reset-week:hover {
@@ -524,74 +661,249 @@ html[data-bg="night"] .term-select-wrap i {
   box-shadow: 0 4px 12px rgba(15, 23, 42, 0.2), inset 0 1px 0.5px rgba(255, 255, 255, 0.3);
 }
 
-.import-file {
-  margin: 0 0 14px;
-  padding: 11px 14px;
-  border-radius: 14px;
-  background: rgba(255, 255, 255, 0.58);
-  color: #334155;
-  font-size: 0.82rem;
-  border: 1px solid rgba(255, 255, 255, 0.7);
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
 
-.import-help {
-  margin: 6px 0 0;
-  color: #64748b;
-  font-size: 0.75rem;
-  line-height: 1.55;
-}
-
-.import-inline-error {
-  margin: 2px 0 8px;
-  color: #e11d48;
-  font-size: 0.78rem;
+.preview-modal {
+  width: min(440px, 100%);
 }
 
 .preview-details {
-  display: grid;
-  gap: 10px;
-  margin: 6px 0 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin: 18px 0 20px;
+  padding: 16px;
+  border-radius: 16px;
+  background: rgba(255, 255, 255, 0.35);
+  border: 1px solid rgba(255, 255, 255, 0.55);
 }
 
 .preview-details > div {
   display: flex;
-  justify-content: space-between;
   align-items: center;
-  gap: 20px;
-  padding: 12px 16px;
-  border-radius: 16px;
-  background: rgba(255, 255, 255, 0.5);
-  border: 1px solid rgba(255, 255, 255, 0.75);
-  box-shadow: inset 0 1px 0.5px #fff;
+  justify-content: space-between;
+  gap: 12px;
+  font-size: 0.88rem;
 }
 
 .preview-details span {
   color: #64748b;
-  font-size: 0.82rem;
-  font-weight: 500;
+  flex-shrink: 0;
 }
 
 .preview-details b {
-  text-align: right;
-  font-size: 0.9rem;
-  font-weight: 600;
   color: #0f172a;
+  text-align: right;
+  word-break: break-word;
 }
 
 .color-preview {
-  display: flex;
+  display: inline-flex;
   align-items: center;
   gap: 8px;
 }
 
 .color-preview i {
-  width: 16px;
-  height: 16px;
+  display: inline-block;
+  width: 14px;
+  height: 14px;
   border-radius: 50%;
-  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.2), inset 0 1px 0.5px rgba(255, 255, 255, 0.6);
+  box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.8), 0 2px 4px rgba(0, 0, 0, 0.15);
+}
+
+.import-setup {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  margin-top: 14px;
+}
+
+.import-file {
+  margin: 0;
+  padding: 10px 14px;
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.45);
+  color: #0f172a;
+  font-size: 0.86rem;
+  font-weight: 600;
+  word-break: break-all;
+}
+
+.import-inline-error {
+  margin: 0;
+  color: #e11d48;
+  font-size: 0.8rem;
+}
+
+.import-help {
+  margin: 0;
+  color: #64748b;
+  font-size: 0.78rem;
+  line-height: 1.5;
+}
+
+.auth-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 60;
+  display: grid;
+  place-items: center;
+  padding: 18px;
+}
+
+.auth-card {
+  width: min(400px, 100%);
+}
+
+.auth-brand {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 16px;
+  color: #0f172a;
+  font-size: 1.05rem;
+}
+
+.auth-head h2 {
+  margin: 0;
+  font-size: 1.5rem;
+  font-weight: 700;
+  color: #0f172a;
+}
+
+.auth-head p {
+  margin: 6px 0 0;
+  color: #64748b;
+  font-size: 0.85rem;
+}
+
+.auth-form label {
+  display: block;
+  margin: 16px 0 0;
+  color: #475569;
+  font-size: 0.82rem;
+  font-weight: 500;
+}
+
+.auth-error {
+  margin: 14px 0 0;
+  color: #e11d48;
+  font-size: 0.8rem;
+}
+
+.auth-submit {
+  width: 100%;
+  margin-top: 20px;
+  padding: 13px;
+  font-size: 0.95rem;
+  font-weight: 600;
+  color: #ffffff;
+  background: linear-gradient(135deg, #1e293b, #0f172a);
+  border-color: rgba(255, 255, 255, 0.15);
+}
+
+.auth-submit:hover {
+  background: linear-gradient(135deg, #334155, #1e293b);
+  color: #ffffff;
+}
+
+.auth-submit:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+  transform: none;
+}
+
+.auth-switch {
+  margin: 18px 0 0;
+  text-align: center;
+  color: #64748b;
+  font-size: 0.84rem;
+}
+
+.auth-switch button {
+  border: 0;
+  background: none;
+  padding: 0 2px;
+  color: #0284c7;
+  font-size: 0.84rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.auth-switch button:hover {
+  text-decoration: underline;
+}
+
+.user-badge {
+  display: flex;
+  align-items: center;
+  max-width: 120px;
+  height: 42px;
+  padding: 0 14px;
+  border: 1px solid rgba(255, 255, 255, 0.6);
+  border-radius: 16px;
+  background: rgba(255, 255, 255, 0.2);
+  color: #334155;
+  font-size: 0.85rem;
+  font-weight: 600;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.header-action.logout {
+  padding: 12px 18px;
+}
+
+html[data-bg="night"] .week-trigger {
+  background: rgba(15, 23, 42, 0.55);
+  border-color: rgba(148, 163, 184, 0.28);
+  color: #f8fafc;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.3), inset 0 1px 0.5px rgba(255, 255, 255, 0.15);
+}
+
+html[data-bg="night"] .week-trigger:hover {
+  background: rgba(30, 41, 59, 0.72);
+}
+
+html[data-bg="night"] .week-trigger small,
+html[data-bg="night"] .week-trigger i {
+  color: #94a3b8;
+}
+
+html[data-bg="night"] .week-menu-head b,
+html[data-bg="night"] .preview-details b,
+html[data-bg="night"] .import-file,
+html[data-bg="night"] .auth-brand,
+html[data-bg="night"] .auth-head h2 {
+  color: #f8fafc;
+}
+
+html[data-bg="night"] .week-option {
+  background: rgba(15, 23, 42, 0.45);
+  border-color: rgba(148, 163, 184, 0.22);
+  color: #f1f5f9;
+}
+
+html[data-bg="night"] .week-option:hover {
+  background: rgba(30, 41, 59, 0.7);
+}
+
+html[data-bg="night"] .week-option.selected {
+  border-color: #38bdf8;
+  background: rgba(56, 189, 248, 0.16);
+  color: #38bdf8;
+}
+
+html[data-bg="night"] .preview-details,
+html[data-bg="night"] .import-file {
+  background: rgba(15, 23, 42, 0.42);
+  border-color: rgba(148, 163, 184, 0.2);
+}
+
+html[data-bg="night"] .user-badge {
+  color: #f1f5f9;
+  background: rgba(15, 23, 42, 0.32);
+  border-color: rgba(148, 163, 184, 0.25);
 }
 
 @media (max-width: 680px) {
@@ -631,6 +943,12 @@ html[data-bg="night"] .term-select-wrap i {
   }
   .grid {
     grid-template-rows: 58px repeat(10, 68px)!important;
+  }
+  .user-badge {
+    display: none;
+  }
+  .header-action.logout {
+    padding: 8px 12px;
   }
 }
 </style>

@@ -1,0 +1,54 @@
+from fastapi import APIRouter, Depends, HTTPException
+
+from ..auth import create_token, get_current_user, hash_password, verify_password
+from ..db import connect
+from ..schemas import LoginIn, RegisterIn
+
+router = APIRouter(prefix="/api", tags=["auth"])
+
+
+@router.post("/register", status_code=201)
+def register(payload: RegisterIn):
+    email = payload.email
+    username = payload.username.strip()
+    if len(username) < 2:
+        raise HTTPException(400, "用户名至少需要 2 个字符")
+    with connect() as db:
+        if db.execute("SELECT 1 FROM users WHERE email=%s", (email,)).fetchone():
+            raise HTTPException(409, "该邮箱已注册")
+        if db.execute("SELECT 1 FROM users WHERE username=%s", (username,)).fetchone():
+            raise HTTPException(409, "用户名已被占用")
+        user = db.execute(
+            "INSERT INTO users(email,username,password_hash) VALUES(%s,%s,%s) RETURNING id,email,username",
+            (email, username, hash_password(payload.password)),
+        ).fetchone()
+        # 为新用户创建一个默认空课表，便于直接添加课程
+        db.execute("INSERT INTO schedules(user_id,name,term) VALUES(%s,%s,%s)", (user["id"], "我的课表", ""))
+    return {
+        "token": create_token(user["id"], user["username"]),
+        "user": {"id": user["id"], "email": user["email"], "username": user["username"]},
+    }
+
+
+@router.post("/login")
+def login(payload: LoginIn):
+    email = payload.email
+    with connect() as db:
+        user = db.execute(
+            "SELECT id,email,username,password_hash FROM users WHERE email=%s", (email,)
+        ).fetchone()
+    if not user or not verify_password(payload.password, user["password_hash"]):
+        raise HTTPException(401, "邮箱或密码错误")
+    return {
+        "token": create_token(user["id"], user["username"]),
+        "user": {"id": user["id"], "email": user["email"], "username": user["username"]},
+    }
+
+
+@router.get("/me")
+def me(user=Depends(get_current_user)):
+    with connect() as db:
+        row = db.execute("SELECT id,email,username FROM users WHERE id=%s", (user["id"],)).fetchone()
+    if not row:
+        raise HTTPException(401, "用户不存在")
+    return {"id": row["id"], "email": row["email"], "username": row["username"]}
