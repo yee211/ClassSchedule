@@ -445,6 +445,11 @@ html[data-bg="frosted"] .ambient-canvas {
   white-space: nowrap;
 }
 
+.delete-schedule:disabled {
+  opacity: 0.42;
+  cursor: not-allowed;
+}
+
 .upload input {
   display: none;
 }

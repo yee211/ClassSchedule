@@ -12,7 +12,7 @@ const courseColors = [
   '#4F46E5','#EA580C','#0F766E','#B91C1C','#9333EA','#0E7490','#CA8A04','#BE185D',
   '#1D4ED8','#15803D','#C2410C','#86198F','#0369A1','#A16207',
 ]
-const week = ref(1), currentWeek = ref(1), schedule = ref(null), loading = ref(true), message = ref('')
+const week = ref(1), currentWeek = ref(1), schedules = ref([]), schedule = ref(null), loading = ref(true), message = ref('')
 const editorOpen = ref(false), previewOpen = ref(false), previewCourse = ref(null), importerOpen = ref(false), importing = ref(false), importSetup = ref(false), importFile = ref(null), suggestions = ref([]), importError = ref('')
 const importStartDate = ref(''), importEndDate = ref('')
 const weekMenuOpen = ref(false)
@@ -49,9 +49,31 @@ async function api(url, options){
   const response=await fetch(url,options); if(!response.ok){let body={};try{body=await response.json()}catch{};throw new Error(body.detail||'请求失败')}
   return response.status===204?null:response.json()
 }
-async function load(){
-  try{const list=await api('/api/schedules'); schedule.value=list[0]||null;currentWeek.value=termWeek(schedule.value?.start_date);if(!schedule.value||week.value===1)week.value=currentWeek.value}
+async function load(preferredId=schedule.value?.id){
+  try{
+    const list=await api('/api/schedules'); schedules.value=list
+    const savedId=Number(localStorage.getItem('active_schedule_id'))
+    schedule.value=list.find(item=>item.id===Number(preferredId)) || list.find(item=>item.id===savedId) || list[0] || null
+    if(schedule.value)localStorage.setItem('active_schedule_id',schedule.value.id)
+    currentWeek.value=termWeek(schedule.value?.start_date);week.value=currentWeek.value
+  }
   catch(error){notify(error.message)} finally{loading.value=false}
+}
+function selectSchedule(event){
+  schedule.value=schedules.value.find(item=>item.id===Number(event.target.value)) || null
+  if(schedule.value)localStorage.setItem('active_schedule_id',schedule.value.id)
+  currentWeek.value=termWeek(schedule.value?.start_date);week.value=currentWeek.value;weekMenuOpen.value=false
+}
+async function deleteSchedule(){
+  const current=schedule.value
+  if(!current)return
+  const title=current.term || current.name || '当前课表'
+  if(!confirm(`确认删除“${title}”？该课表中的全部课程也会被删除。`))return
+  try{
+    await api(`/api/schedules/${current.id}`,{method:'DELETE'})
+    localStorage.removeItem('active_schedule_id')
+    await load(null);notify('课表已删除')
+  }catch(error){notify(error.message)}
 }
 function termWeek(startDate){
   if(!startDate)return 1
@@ -118,7 +140,7 @@ async function startImport(){
   if(importEndDate.value<importStartDate.value){importError.value='学期结束日期不能早于开始日期';return}
   importSetup.value=false;importing.value=true;importError.value=''
   const body=new FormData();body.append('file',importFile.value);body.append('start_date',importStartDate.value);body.append('end_date',importEndDate.value)
-  try{const result=await api('/api/import',{method:'POST',body});if(result.imported){importerOpen.value=false;await load();notify(`已导入 ${result.imported} 条课程安排`)}else{suggestions.value=result.suggestions;notify(result.engine==='ocr-not-installed'?'文件已上传，请安装 OCR 扩展':'识别完成')}}
+  try{const result=await api('/api/import',{method:'POST',body});if(result.imported){importerOpen.value=false;await load(result.schedule_id);notify(result.replaced?`已覆盖当前学期，共 ${result.imported} 条课程安排`:`已导入 ${result.imported} 条课程安排`)}else{suggestions.value=result.suggestions;notify(result.engine==='ocr-not-installed'?'文件已上传，请安装 OCR 扩展':'识别完成')}}
   catch(error){importError.value=error.message;notify(error.message)}finally{importing.value=false}
 }
 function editSuggestion(course){importerOpen.value=false;openEditor(course)}
@@ -158,6 +180,7 @@ onUnmounted(()=>document.removeEventListener('click',closeWeekMenu))
     <header class="top glass">
       <div><span class="brand-dot"></span><strong>简课</strong></div>
       <div class="top-actions">
+        <button class="header-action delete-schedule uiverse-button" type="button" :disabled="!schedule" @click="deleteSchedule"><span aria-hidden="true">−</span> 删除课表</button>
         <button class="header-action uiverse-button" type="button" @click="openEditor()"><span aria-hidden="true">＋</span> 添加课程</button>
         <label class="header-action upload uiverse-button"><input type="file" accept=".pdf,.xlsx,.xlsm,.png,.jpg,.jpeg,.webp" @change="upload"><span aria-hidden="true">↑</span> 上传课表</label>
         <button type="button" class="night-mode-button" :class="{ active: bgMode === 'night' }" :aria-label="bgMode === 'night' ? '切换到日间模式' : '切换到黑夜模式'" :title="bgMode === 'night' ? '日间模式' : '黑夜模式'" :aria-pressed="bgMode === 'night'" @click="toggleNightMode">
@@ -167,7 +190,17 @@ onUnmounted(()=>document.removeEventListener('click',closeWeekMenu))
     </header>
 
     <section class="toolbar glass" aria-label="课表控制">
-      <div><p>当前学期</p><h1>{{ schedule?.term || '我的课表' }}</h1></div>
+      <div class="term-picker">
+        <p>当前学期</p>
+        <label v-if="schedules.length > 1" class="term-select-wrap">
+          <span class="sr-only">切换学期</span>
+          <select :value="schedule?.id" aria-label="切换学期" @change="selectSchedule">
+            <option v-for="item in schedules" :key="item.id" :value="item.id">{{ item.term || item.name || `课表 ${item.id}` }}</option>
+          </select>
+          <i aria-hidden="true">⌄</i>
+        </label>
+        <h1 v-else>{{ schedule?.term || '我的课表' }}</h1>
+      </div>
       <div class="week-picker">
         <button class="week-nav" aria-label="上一周" @click="week=Math.max(1,week-1)">‹</button>
         <div class="week-menu" @click.stop>
@@ -254,6 +287,52 @@ onUnmounted(()=>document.removeEventListener('click',closeWeekMenu))
 </template>
 
 <style>
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+.term-select-wrap {
+  position: relative;
+  display: block;
+}
+
+.term-select-wrap select {
+  max-width: min(360px, 38vw);
+  padding: 2px 28px 2px 0;
+  border: 0;
+  outline: 0;
+  appearance: none;
+  background: transparent;
+  color: #172033;
+  font: inherit;
+  font-size: 1.25rem;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.term-select-wrap i {
+  position: absolute;
+  right: 4px;
+  top: 50%;
+  color: #64748b;
+  font-style: normal;
+  pointer-events: none;
+  transform: translateY(-55%);
+}
+
+html[data-bg="night"] .term-select-wrap select,
+html[data-bg="night"] .term-select-wrap i {
+  color: #f8fafc;
+}
+
 .week-menu {
   position: relative;
   flex: 0 1 164px;
@@ -526,6 +605,10 @@ onUnmounted(()=>document.removeEventListener('click',closeWeekMenu))
   .week-picker {
     width: 100%;
     gap: 4px;
+  }
+  .term-select-wrap select {
+    max-width: calc(100vw - 52px);
+    font-size: 1.06rem;
   }
   .week-menu {
     flex: 1;

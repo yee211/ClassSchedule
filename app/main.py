@@ -67,6 +67,13 @@ def schedules():
         return result
 
 
+@app.delete("/api/schedules/{schedule_id}", status_code=204)
+def delete_schedule(schedule_id: int):
+    with connect() as db:
+        if not db.execute("DELETE FROM schedules WHERE id=%s RETURNING id", (schedule_id,)).fetchone():
+            raise HTTPException(404, "课表不存在")
+
+
 def values(course):
     data = course.model_dump()
     return (data["schedule_id"],data["name"],data["teacher"],data["room"],data["weekday"],
@@ -137,10 +144,24 @@ def import_file(
         raise HTTPException(422, "未找到‘课程明细速查表’或可识别的课程明细")
     if parsed:
         with connect() as db:
+            db.execute("SELECT pg_advisory_xact_lock(hashtext(%s))", (parsed["term"],))
             schedule = db.execute(
-                "INSERT INTO schedules(name,term,start_date,end_date) VALUES(%s,%s,%s,%s) RETURNING *",
-                (parsed["name"], parsed["term"], schedule_start, schedule_end),
+                "SELECT * FROM schedules WHERE term=%s ORDER BY id DESC LIMIT 1 FOR UPDATE",
+                (parsed["term"],),
             ).fetchone()
+            replaced = schedule is not None
+            if schedule:
+                schedule = db.execute(
+                    """UPDATE schedules SET name=%s,start_date=%s,end_date=%s
+                    WHERE id=%s RETURNING *""",
+                    (parsed["name"], schedule_start, schedule_end, schedule["id"]),
+                ).fetchone()
+                db.execute("DELETE FROM courses WHERE schedule_id=%s", (schedule["id"],))
+            else:
+                schedule = db.execute(
+                    "INSERT INTO schedules(name,term,start_date,end_date) VALUES(%s,%s,%s,%s) RETURNING *",
+                    (parsed["name"], parsed["term"], schedule_start, schedule_end),
+                ).fetchone()
             rows = [(
                 schedule["id"], course["name"], course["teacher"], course["room"], course["weekday"],
                 course["start_section"], course["end_section"], json.dumps(course["weeks"]), course["color"],
@@ -150,7 +171,7 @@ def import_file(
                     (schedule_id,name,teacher,room,weekday,start_section,end_section,weeks,color)
                     VALUES(%s,%s,%s,%s,%s,%s,%s,%s::jsonb,%s)""", rows)
         engine = "xlsx-table" if suffix in {".xlsx", ".xlsm"} else "pdf-table"
-        return {"engine": engine, "imported": len(rows), "schedule_id": schedule["id"], "suggestions": []}
+        return {"engine": engine, "imported": len(rows), "schedule_id": schedule["id"], "replaced": replaced, "suggestions": []}
     text, engine = extract_text(target)
     return {"engine": engine, "text": text, "suggestions": suggest_courses(text)}
 
