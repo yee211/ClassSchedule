@@ -1,3 +1,12 @@
+# 阶段 1：前端编译构建
+FROM node:20-alpine AS frontend-builder
+WORKDIR /app/frontend
+COPY frontend/package*.json ./
+RUN npm config set registry https://registry.npmmirror.com && npm install
+COPY frontend/ ./
+RUN npm run build
+
+# 阶段 2：Python 后端运行环境
 FROM python:3.12-slim
 
 ENV PYTHONUNBUFFERED=1 \
@@ -11,10 +20,11 @@ WORKDIR /app
 COPY requirements.txt ./
 RUN pip install --no-cache-dir -r requirements.txt
 
-# 拷贝后端源码与已构建好的前端静态资源
+# 拷贝后端源码与前端构建产物
 COPY app ./app
-COPY frontend/dist ./frontend/dist
+COPY --from=frontend-builder /app/frontend/dist ./frontend/dist
 
 EXPOSE 8000
 
 CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]
+
