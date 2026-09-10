@@ -18,6 +18,7 @@ jobs:
       - run: pytest -v -ra
         env:
           APP_ENV: test
+          PYTHONPATH: .
 
   frontend:
     runs-on: ubuntu-latest
