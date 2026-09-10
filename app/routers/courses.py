@@ -1,4 +1,5 @@
 import json
+
 from fastapi import APIRouter, Depends, HTTPException
 
 from ..auth import get_current_user

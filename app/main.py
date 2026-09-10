@@ -8,8 +8,8 @@ from fastapi.staticfiles import StaticFiles
 
 from .db import close_pool, connect, init_pool
 from .observability import configure_logging, request_metrics_middleware
-from .settings import settings
 from .routers import app_update, auth, courses, importer, schedules
+from .settings import settings
 
 ROOT = Path(__file__).resolve().parent.parent
 FRONTEND_DIST = ROOT / "frontend" / "dist"

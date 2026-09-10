@@ -1,7 +1,10 @@
 ﻿from datetime import date
+
 import pytest
 from fastapi import HTTPException
+
 from app.routers.schedules import ScheduleUpdate, parse_schedule_date
+
 
 def test_parse_schedule_date_valid():
     assert parse_schedule_date("2026-09-07", "测试日期") == date(2026, 9, 7)

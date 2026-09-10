@@ -18,7 +18,6 @@ from pydantic import BaseModel, Field, ValidationError, field_validator, model_v
 from .excel import read_sheets
 from .parser import course_color, merge_section_courses, parse_weeks
 
-
 ROOT = Path(__file__).resolve().parent.parent
 load_dotenv(ROOT / ".env")
 

@@ -1,4 +1,5 @@
 import os
+
 from PIL import Image, ImageDraw
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -25,7 +26,7 @@ def create_icons():
     draw_r = ImageDraw.Draw(mask_rounded_hi)
     draw_r.rounded_rectangle([0, 0, 512 * scale, 512 * scale], radius=110 * scale, fill=255)
     mask_rounded = mask_rounded_hi.resize((512, 512), Image.Resampling.LANCZOS)
-    
+
     icon_rounded = master_512.copy()
     icon_rounded.putalpha(mask_rounded)
 
@@ -51,7 +52,7 @@ def create_icons():
     master_512.convert("RGB").save(os.path.join(PUB_DIR, "xushi-icon.jpg"), quality=95)
     icon_rounded.save(os.path.join(PUB_DIR, "pwa-512x512.png"))
     icon_rounded.save(os.path.join(PUB_DIR, "pwa-maskable-512x512.png"))
-    
+
     icon_rounded.resize((192, 192), Image.Resampling.LANCZOS).save(os.path.join(PUB_DIR, "pwa-192x192.png"))
     icon_rounded.resize((192, 192), Image.Resampling.LANCZOS).save(os.path.join(PUB_DIR, "pwa-maskable-192x192.png"))
     icon_rounded.resize((180, 180), Image.Resampling.LANCZOS).save(os.path.join(PUB_DIR, "apple-touch-icon.png"))

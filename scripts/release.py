@@ -105,7 +105,7 @@ def update_version_files(version_name: str, version_code: int, changelog: list):
     ver_info["versionCode"] = version_code
     ver_info["versionName"] = version_name
     ver_info["title"] = f"发现新版本 v{version_name}"
-    
+
     # 支持带版本号的中文命名（序时）及标准 URL 编码
     apk_filename = f"序时_v{version_name}.apk"
     quoted_apk = urllib.parse.quote(apk_filename)

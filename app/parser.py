@@ -7,7 +7,6 @@ from pathlib import Path
 
 from .excel import read_sheets
 
-
 COLORS = ["#5579E8", "#EF5B78", "#F18745", "#8B6AD8", "#42A5C9", "#55AD72", "#D79D39"]
 
 

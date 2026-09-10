@@ -3,10 +3,10 @@ import os
 from contextlib import contextmanager
 from pathlib import Path
 
+from dotenv import load_dotenv
 from psycopg import connect as pg_connect
 from psycopg.rows import dict_row
 from psycopg_pool import ConnectionPool
-from dotenv import load_dotenv
 
 from .auth import hash_password
 
