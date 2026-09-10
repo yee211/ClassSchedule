@@ -15,7 +15,7 @@ jobs:
           cache: pip
       - run: pip install -r requirements-dev.txt
       - run: ruff check app tests scripts migrations
-      - run: pytest -q
+      - run: pytest -v -ra
         env:
           APP_ENV: test
 
