@@ -11,6 +11,8 @@ import hashlib
 import subprocess
 import shutil
 
+import urllib.parse
+
 # Ensure utf-8 stdout on Windows
 if sys.platform == "win32":
     sys.stdout.reconfigure(encoding='utf-8')
@@ -19,7 +21,6 @@ ROOT_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 FRONTEND_DIR = os.path.join(ROOT_DIR, "frontend")
 ANDROID_DIR = os.path.join(FRONTEND_DIR, "android")
 STATIC_DOWNLOAD_DIR = os.path.join(ROOT_DIR, "static", "downloads")
-DEST_APK = os.path.join(STATIC_DOWNLOAD_DIR, "ClassSchedule.apk")
 BUILT_APK = os.path.join(ANDROID_DIR, "app", "build", "outputs", "apk", "debug", "app-debug.apk")
 
 def calc_md5(filepath):
@@ -69,6 +70,13 @@ def update_version_files(version_name: str, version_code: int, changelog: list):
     ver_info["versionCode"] = version_code
     ver_info["versionName"] = version_name
     ver_info["title"] = f"发现新版本 v{version_name}"
+    
+    # 支持带版本号的中文命名及标准 URL 编码
+    apk_filename = f"时序_v{version_name}.apk"
+    quoted_apk = urllib.parse.quote(apk_filename)
+    ver_info["downloadUrl"] = f"https://gh-proxy.com/https://raw.githubusercontent.com/yee211/ClassSchedule/main/static/downloads/{quoted_apk}"
+    ver_info["backupDownloadUrl"] = f"https://api.tanzeng.xyz/downloads/{quoted_apk}"
+
     if changelog:
         ver_info["changelog"] = changelog
     with open(app_version_path, "w", encoding="utf-8") as f:
@@ -113,18 +121,27 @@ def main():
     gradle_cmd = "gradlew.bat assembleDebug" if os.name == "nt" else "./gradlew assembleDebug"
     run_cmd(gradle_cmd, cwd=ANDROID_DIR)
 
-    # 步骤 5: 拷贝并覆盖 static/downloads/ClassSchedule.apk
+    # 步骤 5: 拷贝并生成多版本分发包 (时序_v{ver}.apk, 时序.apk, ClassSchedule.apk)
     if not os.path.exists(BUILT_APK):
         print(f"[!] 未找到生成的 APK 文件: {BUILT_APK}")
         sys.exit(1)
 
     os.makedirs(STATIC_DOWNLOAD_DIR, exist_ok=True)
-    shutil.copy2(BUILT_APK, DEST_APK)
-    size_mb = os.path.getsize(DEST_APK) / (1024 * 1024)
-    md5_val = calc_md5(DEST_APK)
+    apk_versioned = os.path.join(STATIC_DOWNLOAD_DIR, f"时序_v{version_name}.apk")
+    apk_latest = os.path.join(STATIC_DOWNLOAD_DIR, "时序.apk")
+    apk_legacy = os.path.join(STATIC_DOWNLOAD_DIR, "ClassSchedule.apk")
 
-    print("\n[*] 5. 安装包覆盖成功！")
-    print(f"  -> 目标路径: {DEST_APK}")
+    shutil.copy2(BUILT_APK, apk_versioned)
+    shutil.copy2(BUILT_APK, apk_latest)
+    shutil.copy2(BUILT_APK, apk_legacy)
+
+    size_mb = os.path.getsize(apk_versioned) / (1024 * 1024)
+    md5_val = calc_md5(apk_versioned)
+
+    print("\n[*] 5. 安装包生成与分发成功！")
+    print(f"  -> 版本包: {apk_versioned}")
+    print(f"  -> 最新包: {apk_latest}")
+    print(f"  -> 兼容包: {apk_legacy}")
     print(f"  -> 文件大小: {size_mb:.2f} MB")
     print(f"  -> MD5 校验: {md5_val}")
 
