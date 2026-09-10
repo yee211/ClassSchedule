@@ -1,9 +1,11 @@
 import json
+import logging
 from pathlib import Path
 from fastapi import APIRouter
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 router = APIRouter(prefix="/api/app", tags=["App Update"])
+logger = logging.getLogger("classschedule")
 
 ROOT = Path(__file__).resolve().parent.parent.parent
 VERSION_FILE = ROOT / "data" / "app_version.json"
@@ -26,7 +28,7 @@ class AppVersionResponse(BaseModel):
     versionName: str
     minVersionCode: int = 1
     title: str = "发现新版本"
-    changelog: list[str] = []
+    changelog: list[str] = Field(default_factory=list)
     downloadUrl: str
     backupDownloadUrl: str | None = None
     forceUpdate: bool = False
@@ -40,6 +42,6 @@ def get_app_version() -> AppVersionResponse:
             with open(VERSION_FILE, "r", encoding="utf-8") as f:
                 data = json.load(f)
                 return AppVersionResponse(**data)
-        except Exception:
-            pass
+        except (OSError, ValueError, TypeError) as error:
+            logger.error("读取版本元数据失败: %s", error.__class__.__name__)
     return AppVersionResponse(**DEFAULT_VERSION_INFO)

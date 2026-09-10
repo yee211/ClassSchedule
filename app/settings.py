@@ -25,13 +25,15 @@ class Settings:
     )
 
     def validate(self) -> None:
+        if self.environment not in {"development", "test", "production"}:
+            raise RuntimeError("APP_ENV 只能是 development、test 或 production")
         if self.max_upload_bytes < 1024 or self.max_upload_bytes > 50 * 1024 * 1024:
             raise RuntimeError("MAX_UPLOAD_BYTES 必须在 1KB 到 50MB 之间")
         if self.environment == "production":
             if self.jwt_secret in INSECURE_SECRETS or len(self.jwt_secret) < 32:
                 raise RuntimeError("生产环境必须配置至少 32 字符的随机 JWT_SECRET")
-            if os.getenv("DEFAULT_PASSWORD") == "demo1234":
-                raise RuntimeError("生产环境禁止显式配置默认演示账号密码")
+            if os.getenv("DEFAULT_PASSWORD", "demo1234") == "demo1234":
+                raise RuntimeError("生产环境禁止使用默认演示账号密码")
 
 
 settings = Settings()

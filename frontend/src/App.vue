@@ -1081,7 +1081,9 @@ html[data-bg="night"] .user-badge {
     align-items: center;
     justify-content: space-between;
     width: 100%;
-    gap: 4px;
+    gap: 6px;
+    box-sizing: border-box;
+    min-width: 0;
   }
   .term-picker p {
     margin: 0;
@@ -1103,57 +1105,92 @@ html[data-bg="night"] .user-badge {
     width: 100%;
     gap: 3px;
     justify-content: space-between;
+    box-sizing: border-box;
+    min-width: 0;
   }
   .week-menu {
     flex: 1;
     min-width: 0;
+    position: relative;
   }
   .week-trigger {
-    height: 30px;
-    padding: 2px 8px;
+    height: 28px;
+    padding: 2px 6px;
     border-radius: 20px;
+    gap: 4px;
+    box-sizing: border-box;
+    width: 100%;
   }
   .week-trigger b {
-    font-size: 0.78rem;
+    font-size: 0.74rem;
+    line-height: 1.15;
   }
   .week-trigger small {
-    font-size: 0.58rem;
+    font-size: 0.55rem;
+    line-height: 1.1;
+    letter-spacing: -0.2px;
   }
+  .week-trigger i {
+    font-size: 0.82rem;
+  }
+  /* 周次选择面板向左偏移，与工具栏左侧对齐，消除右侧溢出 */
   .week-menu-panel {
     right: auto;
-    left: 0;
-    width: min(340px, calc(100vw - 16px));
+    left: -29px;
+    width: min(316px, calc(100vw - 20px));
+    max-width: calc(100vw - 20px);
     padding: 10px;
     border-radius: 16px;
+    box-sizing: border-box;
   }
   .week-menu-grid {
     grid-template-columns: repeat(3, minmax(0, 1fr));
     gap: 5px;
   }
   .week-option {
-    min-height: 44px;
+    min-height: 42px;
     padding: 3px 2px;
     border-radius: 12px;
   }
   .week-option b {
-    font-size: 0.74rem;
+    font-size: 0.72rem;
   }
   .week-option small {
-    font-size: 0.54rem;
+    font-size: 0.52rem;
   }
   .reset-week {
-    height: 30px;
-    min-width: 46px;
-    padding: 0 8px;
-    font-size: 0.74rem;
+    height: 28px;
+    min-width: auto;
+    padding: 0 7px;
+    font-size: 0.70rem;
     border-radius: 20px;
+    flex-shrink: 0;
+    white-space: nowrap;
   }
   .week-nav {
-    height: 30px;
-    width: 28px;
-    flex: 0 0 28px;
+    height: 28px;
+    width: 26px;
+    flex: 0 0 26px;
     border-radius: 20px;
-    font-size: 0.95rem;
+    font-size: 0.88rem;
+    padding: 0;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+  }
+}
+
+@media (max-width: 360px) {
+  .week-menu-panel {
+    left: -28px;
+    width: calc(100vw - 16px);
+    max-width: calc(100vw - 16px);
+    padding: 8px;
+  }
+  .reset-week {
+    padding: 0 5px;
+    font-size: 0.66rem;
+    letter-spacing: -0.2px;
   }
 }
 

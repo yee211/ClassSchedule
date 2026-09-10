@@ -3,30 +3,53 @@
 运行方式:
     python scripts/release.py <版本号, 如 2.1.3> <版本代码, 如 5> "更新说明1" "更新说明2" ...
 """
-import sys
-import os
-import json
-import re
 import hashlib
-import subprocess
+import json
+import os
+import re
 import shutil
-
+import subprocess
+import sys
+import tempfile
 import urllib.parse
+from pathlib import Path
+
+from dotenv import load_dotenv
 
 # Ensure utf-8 stdout on Windows
 if sys.platform == "win32":
     sys.stdout.reconfigure(encoding='utf-8')
 
 ROOT_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+load_dotenv(os.path.join(ROOT_DIR, ".env.release"), override=False)
 FRONTEND_DIR = os.path.join(ROOT_DIR, "frontend")
 ANDROID_DIR = os.path.join(FRONTEND_DIR, "android")
 STATIC_DOWNLOAD_DIR = os.path.join(ROOT_DIR, "static", "downloads")
-BUILT_APK = os.path.join(ANDROID_DIR, "app", "build", "outputs", "apk", "debug", "app-debug.apk")
+BUILT_APK = os.path.join(ANDROID_DIR, "app", "build", "outputs", "apk", "release", "app-release.apk")
+FRONTEND_DIST = os.path.join(FRONTEND_DIR, "dist")
+ANDROID_WEB_ASSETS = os.path.join(ANDROID_DIR, "app", "src", "main", "assets", "public")
+APPLICATION_ID = "io.github.yee211.classschedule"
+VERSION_FILES = [
+    os.path.join(FRONTEND_DIR, "src", "utils", "version.js"),
+    os.path.join(ANDROID_DIR, "app", "build.gradle"),
+    os.path.join(FRONTEND_DIR, "package.json"),
+    os.path.join(FRONTEND_DIR, "package-lock.json"),
+    os.path.join(ROOT_DIR, "data", "app_version.json"),
+    os.path.join(ROOT_DIR, "README.md"),
+]
 
 def calc_md5(filepath):
     h = hashlib.md5()
     with open(filepath, "rb") as f:
         while chunk := f.read(8192):
+            h.update(chunk)
+    return h.hexdigest().upper()
+
+
+def calc_sha256(filepath):
+    h = hashlib.sha256()
+    with open(filepath, "rb") as f:
+        while chunk := f.read(1024 * 1024):
             h.update(chunk)
     return h.hexdigest().upper()
 
@@ -63,6 +86,18 @@ def update_version_files(version_name: str, version_code: int, changelog: list):
         f.write("\n")
     print("  -> 已更新 frontend/package.json")
 
+    # package-lock.json 的根版本必须与 package.json 保持一致，确保 npm ci 可复现。
+    lock_path = os.path.join(FRONTEND_DIR, "package-lock.json")
+    with open(lock_path, "r", encoding="utf-8") as f:
+        lock = json.load(f)
+    lock["version"] = version_name
+    if "" in lock.get("packages", {}):
+        lock["packages"][""]["version"] = version_name
+    with open(lock_path, "w", encoding="utf-8") as f:
+        json.dump(lock, f, indent=2, ensure_ascii=False)
+        f.write("\n")
+    print("  -> 已更新 frontend/package-lock.json")
+
     # 1.4 data/app_version.json
     app_version_path = os.path.join(ROOT_DIR, "data", "app_version.json")
     with open(app_version_path, "r", encoding="utf-8") as f:
@@ -98,12 +133,149 @@ def update_version_files(version_name: str, version_code: int, changelog: list):
             f.write(readme)
         print("  -> 已更新 README.md")
 
-def run_cmd(cmd, cwd):
-    print(f"[*] 执行命令: {cmd} (目录: {cwd})")
-    res = subprocess.run(cmd, shell=True, cwd=cwd)
-    if res.returncode != 0:
-        print(f"[!] 命令执行失败: {cmd}")
-        sys.exit(res.returncode)
+def run_cmd(cmd: list[str], cwd: str):
+    print(f"[*] 执行命令: {' '.join(cmd)} (目录: {cwd})")
+    subprocess.run(cmd, check=True, cwd=cwd)
+
+
+def run_capture(cmd: list[str], cwd: str) -> str:
+    result = subprocess.run(cmd, check=True, cwd=cwd, text=True, capture_output=True, encoding="utf-8", errors="replace")
+    return result.stdout.strip()
+
+
+def android_sdk_dir() -> Path:
+    configured = os.getenv("ANDROID_HOME") or os.getenv("ANDROID_SDK_ROOT")
+    if configured:
+        candidate = Path(configured)
+        if candidate.is_dir():
+            return candidate
+    properties = Path(ANDROID_DIR) / "local.properties"
+    if properties.is_file():
+        for line in properties.read_text(encoding="utf-8").splitlines():
+            if line.startswith("sdk.dir="):
+                value = line.split("=", 1)[1].replace(r"\:", ":").replace(r"\\", "\\")
+                candidate = Path(value)
+                if candidate.is_dir():
+                    return candidate
+    raise FileNotFoundError("未找到 Android SDK，请配置 ANDROID_HOME、ANDROID_SDK_ROOT 或 local.properties")
+
+
+def find_android_tool(name: str) -> str:
+    sdk = android_sdk_dir()
+    suffix = ".bat" if os.name == "nt" else ""
+    pattern = f"{name}{suffix}"
+    roots = [sdk / "build-tools", sdk / "cmdline-tools"]
+    matches = [path for root in roots if root.is_dir() for path in root.rglob(pattern)]
+    if not matches:
+        raise FileNotFoundError(f"Android SDK 中未找到 {pattern}")
+    return str(max(matches, key=lambda path: path.stat().st_mtime))
+
+
+def validate_version_files(version_name: str, version_code: int) -> None:
+    version_js = Path(FRONTEND_DIR, "src", "utils", "version.js").read_text(encoding="utf-8")
+    gradle = Path(ANDROID_DIR, "app", "build.gradle").read_text(encoding="utf-8")
+    package = json.loads(Path(FRONTEND_DIR, "package.json").read_text(encoding="utf-8"))
+    lock = json.loads(Path(FRONTEND_DIR, "package-lock.json").read_text(encoding="utf-8"))
+    remote = json.loads(Path(ROOT_DIR, "data", "app_version.json").read_text(encoding="utf-8"))
+    checks = {
+        "version.js versionName": f"CURRENT_VERSION_NAME = '{version_name}'" in version_js,
+        "version.js versionCode": f"CURRENT_VERSION_CODE = {version_code}" in version_js,
+        "build.gradle versionName": f'versionName "{version_name}"' in gradle,
+        "build.gradle versionCode": f"versionCode {version_code}" in gradle,
+        "package.json": package.get("version") == version_name,
+        "package-lock.json": lock.get("version") == version_name and lock.get("packages", {}).get("", {}).get("version") == version_name,
+        "app_version.json": remote.get("versionName") == version_name and remote.get("versionCode") == version_code,
+    }
+    failed = [label for label, passed in checks.items() if not passed]
+    if failed:
+        raise RuntimeError("版本文件不一致: " + ", ".join(failed))
+
+
+def verify_apk(apk_path: str, version_name: str, version_code: int) -> str:
+    apksigner = find_android_tool("apksigner")
+    signature = run_capture([apksigner, "verify", "--verbose", "--print-certs", apk_path], cwd=ANDROID_DIR)
+    if "Verifies" not in signature or "Number of signers:" not in signature:
+        raise RuntimeError("APK 签名验证没有返回有效签名者")
+    analyzer = find_android_tool("apkanalyzer")
+    app_id = run_capture([analyzer, "manifest", "application-id", apk_path], cwd=ANDROID_DIR)
+    actual_name = run_capture([analyzer, "manifest", "version-name", apk_path], cwd=ANDROID_DIR)
+    actual_code = run_capture([analyzer, "manifest", "version-code", apk_path], cwd=ANDROID_DIR)
+    if (app_id, actual_name, actual_code) != (APPLICATION_ID, version_name, str(version_code)):
+        raise RuntimeError(
+            f"APK 内版本不符: package={app_id}, versionName={actual_name}, versionCode={actual_code}"
+        )
+    digest_match = re.search(r"certificate SHA-256 digest: ([0-9a-f]+)", signature, re.IGNORECASE)
+    return digest_match.group(1).upper() if digest_match else "UNKNOWN"
+
+
+def distribute_apk(source: str, version_name: str) -> list[Path]:
+    download_dir = Path(STATIC_DOWNLOAD_DIR)
+    download_dir.mkdir(parents=True, exist_ok=True)
+    names = [f"序时_v{version_name}.apk", "序时.apk", "ClassSchedule.apk", f"时序_v{version_name}.apk", "时序.apk"]
+    targets = [download_dir / name for name in names]
+    with tempfile.TemporaryDirectory(prefix=".release-", dir=download_dir) as temp_name:
+        temp_dir = Path(temp_name)
+        staged = []
+        backups = {}
+        for target in targets:
+            item = temp_dir / target.name
+            shutil.copy2(source, item)
+            staged.append(item)
+            if target.exists():
+                backup = temp_dir / f"{target.name}.previous"
+                shutil.copy2(target, backup)
+                backups[target] = backup
+        hashes = {calc_sha256(item) for item in staged}
+        sizes = {item.stat().st_size for item in staged}
+        if len(hashes) != 1 or len(sizes) != 1:
+            raise RuntimeError("分发 APK 的大小或 SHA-256 不一致")
+        replaced = []
+        try:
+            for item, target in zip(staged, targets):
+                os.replace(item, target)
+                replaced.append(target)
+        except Exception:
+            for target in reversed(replaced):
+                backup = backups.get(target)
+                if backup and backup.exists():
+                    os.replace(backup, target)
+                else:
+                    target.unlink(missing_ok=True)
+            raise
+    return targets
+
+
+def restore_tree(source: Path, target: Path) -> None:
+    if target.exists():
+        shutil.rmtree(target)
+    if source.exists():
+        shutil.copytree(source, target)
+
+
+def validate_release(version_name: str, version_code: int) -> None:
+    if not re.fullmatch(r"\d+\.\d+\.\d+", version_name):
+        raise ValueError("版本号必须是语义化版本，例如 2.1.7")
+    if version_code <= 0:
+        raise ValueError("versionCode 必须是正整数")
+    try:
+        published_text = run_capture(
+            ["git", "show", "HEAD:frontend/src/utils/version.js"],
+            cwd=ROOT_DIR,
+        )
+    except (FileNotFoundError, subprocess.CalledProcessError):
+        published_text = Path(FRONTEND_DIR, "src", "utils", "version.js").read_text(encoding="utf-8")
+    published_match = re.search(r"CURRENT_VERSION_CODE = (\d+)", published_text)
+    if published_match and version_code <= int(published_match.group(1)):
+        raise ValueError(f"versionCode 必须大于已提交版本 {published_match.group(1)}")
+    required_signing = (
+        "ANDROID_KEYSTORE_PATH", "ANDROID_KEYSTORE_PASSWORD",
+        "ANDROID_KEY_ALIAS", "ANDROID_KEY_PASSWORD",
+    )
+    missing = [name for name in required_signing if not os.getenv(name)]
+    if missing:
+        raise ValueError("正式 APK 缺少签名环境变量: " + ", ".join(missing))
+    if not Path(os.environ["ANDROID_KEYSTORE_PATH"]).is_file():
+        raise ValueError("ANDROID_KEYSTORE_PATH 指向的签名文件不存在")
 
 def main():
     if len(sys.argv) < 3:
@@ -115,57 +287,61 @@ def main():
     version_code = int(sys.argv[2])
     changelog = sys.argv[3:] if len(sys.argv) > 3 else ["常规优化与体验提升"]
 
-    print(f"==================================================")
+    validate_release(version_name, version_code)
+    snapshots = {path: Path(path).read_bytes() for path in VERSION_FILES if os.path.exists(path)}
+
+    print("==================================================")
     print(f" 开始发布 序时 App v{version_name} (versionCode: {version_code})")
-    print(f"==================================================")
+    print("==================================================")
 
-    # 步骤 1: 更新配置文件
-    update_version_files(version_name, version_code, changelog)
+    with tempfile.TemporaryDirectory(prefix="xushi-release-rollback-") as rollback_name:
+        rollback_dir = Path(rollback_name)
+        tree_snapshots = []
+        for index, directory in enumerate((Path(FRONTEND_DIST), Path(ANDROID_WEB_ASSETS))):
+            backup = rollback_dir / str(index)
+            if directory.exists():
+                shutil.copytree(directory, backup)
+            tree_snapshots.append((backup, directory))
+        try:
+            # 版本同步后严格执行 Vite -> Capacitor -> Gradle -> 校验 -> 原子分发。
+            update_version_files(version_name, version_code, changelog)
+            validate_version_files(version_name, version_code)
+            print("\n[*] 2. 编译前端 Vue 项目 (vite build)...")
+            run_cmd(["npm.cmd" if os.name == "nt" else "npm", "run", "build"], cwd=FRONTEND_DIR)
+            print("\n[*] 3. 同步前端资源到 Capacitor Android 原生目录...")
+            run_cmd(["npx.cmd" if os.name == "nt" else "npx", "cap", "sync", "android"], cwd=FRONTEND_DIR)
+            print("\n[*] 4. 编译并签名 Android Release APK...")
+            gradle = os.path.join(ANDROID_DIR, "gradlew.bat" if os.name == "nt" else "gradlew")
+            run_cmd([gradle, "assembleRelease"], cwd=ANDROID_DIR)
+            if not os.path.exists(BUILT_APK):
+                raise FileNotFoundError(f"未找到生成的 Release APK: {BUILT_APK}")
+            print("\n[*] 5. 验证 APK 签名与内部版本...")
+            certificate_sha256 = verify_apk(BUILT_APK, version_name, version_code)
+            distributed = distribute_apk(BUILT_APK, version_name)
+        except Exception:
+            for path, content in snapshots.items():
+                Path(path).write_bytes(content)
+            for backup, directory in tree_snapshots:
+                restore_tree(backup, directory)
+            print("[!] 构建失败，已恢复版本元数据、前端构建产物和 Android Web 资源。")
+            raise
 
-    # 步骤 2: 前端打包
-    print("\n[*] 2. 编译前端 Vue 项目 (vite build)...")
-    run_cmd("npm run build", cwd=FRONTEND_DIR)
-
-    # 步骤 3: 同步前端资源到 Android
-    print("\n[*] 3. 同步前端构建产物到 Capacitor Android 原生目录...")
-    run_cmd("npx cap sync android", cwd=FRONTEND_DIR)
-
-    # 步骤 4: 编译 Android 原生 APK
-    print("\n[*] 4. 调用 Gradle 编译 Android 原生 APK...")
-    gradle_cmd = "gradlew.bat assembleDebug" if os.name == "nt" else "./gradlew assembleDebug"
-    run_cmd(gradle_cmd, cwd=ANDROID_DIR)
-
-    # 步骤 5: 拷贝并生成多版本分发包 (序时_v{ver}.apk, 序时.apk, ClassSchedule.apk)
-    if not os.path.exists(BUILT_APK):
-        print(f"[!] 未找到生成的 APK 文件: {BUILT_APK}")
-        sys.exit(1)
-
-    os.makedirs(STATIC_DOWNLOAD_DIR, exist_ok=True)
-    apk_versioned = os.path.join(STATIC_DOWNLOAD_DIR, f"序时_v{version_name}.apk")
-    apk_latest = os.path.join(STATIC_DOWNLOAD_DIR, "序时.apk")
-    apk_legacy = os.path.join(STATIC_DOWNLOAD_DIR, "ClassSchedule.apk")
-    apk_alias_ver = os.path.join(STATIC_DOWNLOAD_DIR, f"时序_v{version_name}.apk")
-    apk_alias_lat = os.path.join(STATIC_DOWNLOAD_DIR, "时序.apk")
-
-    shutil.copy2(BUILT_APK, apk_versioned)
-    shutil.copy2(BUILT_APK, apk_latest)
-    shutil.copy2(BUILT_APK, apk_legacy)
-    shutil.copy2(BUILT_APK, apk_alias_ver)
-    shutil.copy2(BUILT_APK, apk_alias_lat)
-
-    size_mb = os.path.getsize(apk_versioned) / (1024 * 1024)
+    apk_versioned = distributed[0]
+    size_mb = apk_versioned.stat().st_size / (1024 * 1024)
     md5_val = calc_md5(apk_versioned)
 
-    print("\n[*] 5. 安装包生成与分发成功！")
-    print(f"  -> 序时版本包: {apk_versioned}")
-    print(f"  -> 序时最新包: {apk_latest}")
-    print(f"  -> 兼容包: {apk_legacy}")
+    print("\n[*] 6. 本地安装包构建与校验成功！")
+    for item in distributed:
+        print(f"  -> {item.name}: {item}")
     print(f"  -> 文件大小: {size_mb:.2f} MB")
+    sha256_val = calc_sha256(apk_versioned)
     print(f"  -> MD5 校验: {md5_val}")
+    print(f"  -> SHA-256 校验: {sha256_val}")
+    print(f"  -> 签名证书 SHA-256: {certificate_sha256}")
 
     print("\n==================================================")
-    print(" 编译与打包流水线全部完成！后续推送指引：")
-    print(" 1. git add .")
+    print(" 本地构建完成；完成服务器同步与线上复核后才算发布完成。")
+    print(" 1. 仅暂存本次版本文件与已验证的 APK 产物")
     print(f" 2. git commit -m \"release: v{version_name} (code: {version_code})\"")
     print(" 3. git push")
     print(" 4. 在宝塔终端执行: cd /www/wwwroot/ClassSchedule && git pull origin main")

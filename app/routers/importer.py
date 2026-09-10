@@ -65,7 +65,8 @@ def import_file(
             # AI 未配置、超时或识别失败时静默回退到确定性解析，保证导入功能不中断
             try:
                 parsed = parse_excel_schedule(target)
-            except Exception:
+            except Exception as error:
+                logger.warning("本地 Excel 解析失败: %s", error.__class__.__name__)
                 parsed = None
             engine = f"excel-fallback({engine})"
         if not parsed:

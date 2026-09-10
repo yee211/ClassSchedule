@@ -35,6 +35,11 @@ def upgrade():
         weeks JSONB NOT NULL DEFAULT '[]'::jsonb,
         color VARCHAR(16) NOT NULL DEFAULT '#5B8DEF',
         CHECK (end_section >= start_section))""")
+    # A pre-Alembic installation may already have these tables. Add the
+    # compatibility columns before creating indexes that reference them.
+    op.execute("ALTER TABLE users ADD COLUMN IF NOT EXISTS email VARCHAR(254)")
+    op.execute("ALTER TABLE schedules ADD COLUMN IF NOT EXISTS user_id BIGINT REFERENCES users(id) ON DELETE CASCADE")
+    op.execute("ALTER TABLE schedules ADD COLUMN IF NOT EXISTS end_date DATE")
     op.execute("CREATE INDEX IF NOT EXISTS idx_courses_schedule_id ON courses(schedule_id)")
     op.execute("CREATE INDEX IF NOT EXISTS idx_schedules_user_id ON schedules(user_id)")
     op.execute("CREATE INDEX IF NOT EXISTS idx_schedules_user_id_term ON schedules(user_id, term)")

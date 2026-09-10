@@ -1,7 +1,7 @@
 {
   "name": "class-schedule-web",
   "private": true,
-  "version": "2.1.6",
+  "version": "2.1.7",
   "type": "module",
   "scripts": {
     "dev": "vite",
@@ -14,9 +14,9 @@
   "dependencies": {
     "@capacitor/android": "^8.5.1",
     "@capacitor/core": "^8.5.1",
-    "@vitejs/plugin-vue": "latest",
-    "vite": "latest",
-    "vue": "latest"
+    "@vitejs/plugin-vue": "6.0.8",
+    "vite": "8.2.2",
+    "vue": "3.5.42"
   },
   "devDependencies": {
     "@capacitor/cli": "^8.5.1"

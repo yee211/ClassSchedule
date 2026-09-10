@@ -452,4 +452,147 @@ html[data-bg="night"] .term-card-meta {
 html[data-bg="night"] .term-selected-icon {
   color: #38bdf8;
 }
+
+/* 移动端与不同手机屏幕适配：缩小尺寸与防止右侧溢出 */
+@media (max-width: 680px) {
+  .term-meta-row {
+    margin-bottom: 0;
+    gap: 6px;
+    flex-shrink: 0;
+  }
+
+  .term-status-line {
+    font-size: 0.72rem;
+    white-space: nowrap;
+  }
+
+  .history-pill {
+    font-size: 0.64rem;
+    padding: 1px 5px;
+  }
+
+  .term-edit-btn {
+    padding: 2px 6px !important;
+    font-size: 0.68rem !important;
+    height: 26px;
+  }
+
+  .term-menu {
+    flex: 1;
+    min-width: 0;
+    display: flex;
+    justify-content: flex-end;
+  }
+
+  .term-trigger {
+    padding: 2px 9px;
+    font-size: 0.82rem;
+    font-weight: 600;
+    gap: 4px;
+    height: 30px;
+    border-radius: 20px;
+    max-width: 100%;
+  }
+
+  .term-name {
+    font-size: 0.82rem;
+    max-width: 100%;
+  }
+
+  .term-trigger i {
+    font-size: 0.82rem;
+  }
+
+  /* 学期下拉面板：右对齐向左展开，杜绝超出屏幕右边缘 */
+  .term-menu-panel {
+    left: auto;
+    right: 0;
+    width: min(320px, calc(100vw - 20px));
+    max-width: calc(100vw - 20px);
+    padding: 10px;
+    border-radius: 16px;
+  }
+
+  .term-menu-head {
+    font-size: 0.78rem;
+    margin-bottom: 8px;
+    padding-bottom: 6px;
+  }
+
+  .term-count-tip {
+    font-size: 0.68rem;
+  }
+
+  .term-card-option {
+    padding: 8px 10px;
+    border-radius: 12px;
+    gap: 8px;
+  }
+
+  .term-card-title {
+    font-size: 0.86rem;
+  }
+
+  .status-pill {
+    font-size: 0.64rem;
+    padding: 1px 5px;
+  }
+
+  .term-card-meta {
+    font-size: 0.68rem;
+    gap: 6px;
+  }
+
+  .term-selected-icon {
+    font-size: 0.98rem;
+  }
+
+  /* 周次控件移动端基础样式协同 */
+  .week-menu-panel {
+    left: -29px;
+    right: auto;
+    width: min(316px, calc(100vw - 20px));
+    max-width: calc(100vw - 20px);
+    box-sizing: border-box;
+  }
+}
+
+/* 窄屏手机特殊优化 (<=360px，如小屏机型或开启高 DPI 缩放模式) */
+@media (max-width: 360px) {
+  .term-meta-row {
+    gap: 4px;
+  }
+
+  .term-status-line span:first-child {
+    font-size: 0.68rem;
+  }
+
+  .term-edit-btn {
+    padding: 1px 5px !important;
+    font-size: 0.64rem !important;
+  }
+
+  .term-trigger {
+    padding: 2px 7px;
+    font-size: 0.76rem;
+    height: 28px;
+  }
+
+  .term-name {
+    font-size: 0.76rem;
+  }
+
+  .term-menu-panel {
+    width: calc(100vw - 16px);
+    max-width: calc(100vw - 16px);
+    padding: 8px;
+  }
+
+  .week-menu-panel {
+    left: -28px;
+    width: calc(100vw - 16px);
+    max-width: calc(100vw - 16px);
+    padding: 8px;
+  }
+}
 </style>

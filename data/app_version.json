@@ -1,14 +1,14 @@
 {
-  "versionCode": 8,
-  "versionName": "2.1.6",
+  "versionCode": 9,
+  "versionName": "2.1.7",
   "minVersionCode": 1,
-  "title": "发现新版本 v2.1.6",
+  "title": "发现新版本 v2.1.7",
   "changelog": [
-    "开屏图片动画缩短至1秒，秒开课表",
-    "网页端增加安卓APK下载与安装按钮",
-    "数据库端口统一调整为标准5432"
+    "优化移动端学期与周次选择布局",
+    "修复窄屏工具栏及下拉面板溢出",
+    "增强安全配置与签名发布校验"
   ],
-  "downloadUrl": "https://gh-proxy.com/https://raw.githubusercontent.com/yee211/ClassSchedule/main/static/downloads/%E5%BA%8F%E6%97%B6_v2.1.6.apk",
-  "backupDownloadUrl": "https://api.tanzeng.xyz/downloads/%E5%BA%8F%E6%97%B6_v2.1.6.apk",
+  "downloadUrl": "https://gh-proxy.com/https://raw.githubusercontent.com/yee211/ClassSchedule/main/static/downloads/%E5%BA%8F%E6%97%B6_v2.1.7.apk",
+  "backupDownloadUrl": "https://api.tanzeng.xyz/downloads/%E5%BA%8F%E6%97%B6_v2.1.7.apk",
   "forceUpdate": false
 }

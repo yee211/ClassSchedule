@@ -5,6 +5,7 @@ AI_API_KEY 为空时本模块直接返回 ai-not-configured，调用方会自动
 app/parser.py 的确定性解析，因此项目在未配置任何密钥时依然完整可用。
 """
 import json
+import logging
 import os
 import re
 from pathlib import Path
@@ -14,7 +15,7 @@ from dotenv import load_dotenv
 from openpyxl.utils import get_column_letter
 from pydantic import BaseModel, Field, ValidationError, field_validator, model_validator
 
-from .excel import MAX_ROWS_PER_SHEET, read_sheets
+from .excel import read_sheets
 from .parser import course_color, merge_section_courses, parse_weeks
 
 
@@ -24,6 +25,7 @@ load_dotenv(ROOT / ".env")
 AI_BASE_URL = os.getenv("AI_BASE_URL", "https://api.deepseek.com/v1").rstrip("/")
 AI_API_KEY = os.getenv("AI_API_KEY", "").strip().strip('"').strip("'")
 AI_MODEL = os.getenv("AI_MODEL", "deepseek-chat")
+logger = logging.getLogger("classschedule")
 
 AI_TIMEOUT = min(60.0, max(5.0, float(os.getenv("AI_TIMEOUT_SECONDS", "45"))))
 AI_MAX_INPUT_CHARS = int(os.getenv("AI_MAX_INPUT_CHARS", "60000"))
@@ -189,7 +191,8 @@ def parse_with_ai(path: Path) -> tuple[dict | None, str]:
         return None, "ai-not-configured"
     try:
         serialized = serialize_workbook(path)
-    except Exception:
+    except Exception as error:
+        logger.warning("AI 输入序列化失败: %s", error.__class__.__name__)
         return None, "ai-unreadable"
     if not serialized.strip():
         return None, "ai-empty-workbook"
@@ -208,9 +211,10 @@ def parse_with_ai(path: Path) -> tuple[dict | None, str]:
                 ],
             },
         )
-    except Exception:
+    except Exception as error:
         # 契约是“永不抛出”，因此不只捕 httpx.HTTPError：非法 URL、不支持的协议、
         # 重定向与解码异常等也应降级为兜底解析，而不是变成 500
+        logger.warning("AI 服务调用失败: %s", error.__class__.__name__)
         return None, "ai-unavailable"
     if response.status_code != 200:
         return None, f"ai-http-{response.status_code}"

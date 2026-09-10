@@ -1,8 +1,8 @@
 # 阶段 1：前端编译构建
-FROM node:20-alpine AS frontend-builder
+FROM node:22-alpine AS frontend-builder
 WORKDIR /app/frontend
 COPY frontend/package*.json ./
-RUN npm config set registry https://registry.npmmirror.com && npm install
+RUN npm config set registry https://registry.npmmirror.com && npm ci
 COPY frontend/ ./
 RUN npm run build
 

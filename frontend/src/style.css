@@ -1427,6 +1427,19 @@ html[data-bg="night"] .user-menu-link:hover { background: rgba(255, 255, 255, 0.
     --grid-section-height: 48px;
     --section-col-width: 25px;
   }
+  .toolbar {
+    padding: 6px 8px;
+    border-radius: 14px;
+    gap: 5px;
+  }
+  .header-action {
+    padding: 0 5px;
+    font-size: 0.70rem;
+    gap: 2px;
+  }
+  .top {
+    padding: 0 6px;
+  }
   .section-times span:last-child {
     display: none;
   }
