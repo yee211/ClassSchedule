@@ -72,27 +72,46 @@ const semesterSaving = ref(false);
 
 const pwaHelpOpen = ref(false);
 const canNativeInstall = ref(false);
+const isPwaInstalled = ref(false);
 let deferredInstallPrompt = null;
 
-if (typeof window !== 'undefined') {
-  window.addEventListener('beforeinstallprompt', (e) => {
-    e.preventDefault();
-    deferredInstallPrompt = e;
-    canNativeInstall.value = true;
-  });
+function detectInstalledPwa() {
+  return window.matchMedia('(display-mode: standalone)').matches
+    || window.matchMedia('(display-mode: fullscreen)').matches
+    || window.navigator.standalone === true;
+}
 
-  window.addEventListener('appinstalled', () => {
-    deferredInstallPrompt = null;
-    canNativeInstall.value = false;
-    notify('简课已成功添加到桌面');
-  });
+function handleInstallPrompt(event) {
+  event.preventDefault();
+  deferredInstallPrompt = event;
+  canNativeInstall.value = true;
+}
+
+function handleAppInstalled() {
+  deferredInstallPrompt = null;
+  canNativeInstall.value = false;
+  isPwaInstalled.value = true;
+  pwaHelpOpen.value = false;
+  notify('简课已成功添加到桌面');
+}
+
+function openPwaHelp() {
+  isPwaInstalled.value = detectInstalledPwa();
+  pwaHelpOpen.value = true;
 }
 
 async function triggerInstallPwa() {
+  if (detectInstalledPwa()) {
+    isPwaInstalled.value = true;
+    notify('简课已经在独立应用模式中运行');
+    return;
+  }
+
   if (deferredInstallPrompt) {
     try {
-      deferredInstallPrompt.prompt();
-      const choice = await deferredInstallPrompt.userChoice;
+      const promptEvent = deferredInstallPrompt;
+      await promptEvent.prompt();
+      const choice = await promptEvent.userChoice;
       if (choice && choice.outcome === 'accepted') {
         notify('正在添加到桌面…');
       }
@@ -104,7 +123,7 @@ async function triggerInstallPwa() {
       console.warn('Native install prompt failed:', e);
     }
   }
-  pwaHelpOpen.value = true;
+  canNativeInstall.value = false;
 }
 
 
@@ -414,6 +433,9 @@ function toggleNightMode() {
 onMounted(async () => {
   document.documentElement.setAttribute('data-bg', bgMode.value);
   window.addEventListener('auth:expired', logout);
+  window.addEventListener('beforeinstallprompt', handleInstallPrompt);
+  window.addEventListener('appinstalled', handleAppInstalled);
+  isPwaInstalled.value = detectInstalledPwa();
   if (getToken()) {
     try {
       user.value = await authApi.me();
@@ -428,6 +450,8 @@ onMounted(async () => {
 
 onUnmounted(() => {
   window.removeEventListener('auth:expired', logout);
+  window.removeEventListener('beforeinstallprompt', handleInstallPrompt);
+  window.removeEventListener('appinstalled', handleAppInstalled);
   window.clearInterval(importTimer);
 });
 </script>
@@ -462,7 +486,7 @@ onUnmounted(() => {
       @logout="logout"
       @toggle-night-mode="toggleNightMode"
       @open-semester-settings="openSemesterSettings"
-      @open-pwa-help="triggerInstallPwa"
+      @open-pwa-help="openPwaHelp"
     />
 
     <ScheduleToolbar
@@ -547,6 +571,7 @@ onUnmounted(() => {
   <PwaHelpModal
     :open="pwaHelpOpen"
     :can-native-install="canNativeInstall"
+    :installed="isPwaInstalled"
     @close="pwaHelpOpen = false"
     @install="triggerInstallPwa"
   />
