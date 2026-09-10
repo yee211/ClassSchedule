@@ -31,6 +31,7 @@ import CoursePreviewModal from './components/CoursePreviewModal.vue';
 import CourseEditorModal from './components/CourseEditorModal.vue';
 import ImporterModal from './components/ImporterModal.vue';
 import SemesterModal from './components/SemesterModal.vue';
+import PwaHelpModal from './components/PwaHelpModal.vue';
 import AuthModal from './components/AuthModal.vue';
 
 // 基础状态
@@ -68,6 +69,44 @@ let importTimer = null;
 
 const semesterModalOpen = ref(false);
 const semesterSaving = ref(false);
+
+const pwaHelpOpen = ref(false);
+const canNativeInstall = ref(false);
+let deferredInstallPrompt = null;
+
+if (typeof window !== 'undefined') {
+  window.addEventListener('beforeinstallprompt', (e) => {
+    e.preventDefault();
+    deferredInstallPrompt = e;
+    canNativeInstall.value = true;
+  });
+
+  window.addEventListener('appinstalled', () => {
+    deferredInstallPrompt = null;
+    canNativeInstall.value = false;
+    notify('简课已成功添加到桌面');
+  });
+}
+
+async function triggerInstallPwa() {
+  if (deferredInstallPrompt) {
+    try {
+      deferredInstallPrompt.prompt();
+      const choice = await deferredInstallPrompt.userChoice;
+      if (choice && choice.outcome === 'accepted') {
+        notify('正在添加到桌面…');
+      }
+      deferredInstallPrompt = null;
+      canNativeInstall.value = false;
+      pwaHelpOpen.value = false;
+      return;
+    } catch (e) {
+      console.warn('Native install prompt failed:', e);
+    }
+  }
+  pwaHelpOpen.value = true;
+}
+
 
 // 计算属性
 const weekOptions = computed(() =>
@@ -423,6 +462,7 @@ onUnmounted(() => {
       @logout="logout"
       @toggle-night-mode="toggleNightMode"
       @open-semester-settings="openSemesterSettings"
+      @open-pwa-help="triggerInstallPwa"
     />
 
     <ScheduleToolbar
@@ -502,6 +542,15 @@ onUnmounted(() => {
     @save="saveSemesterSettings"
     @delete="deleteSchedule"
   />
+
+  <!-- PWA 添加到桌面指引模态弹窗 -->
+  <PwaHelpModal
+    :open="pwaHelpOpen"
+    :can-native-install="canNativeInstall"
+    @close="pwaHelpOpen = false"
+    @install="triggerInstallPwa"
+  />
+
 
 
   <Transition name="toast">

@@ -3,6 +3,7 @@ const CACHE_NAME = 'jianke-cache-v1';
 const STATIC_PRECACHE = [
   '/',
   '/index.html',
+  '/manifest.json',
   '/manifest.webmanifest',
   '/pwa-192x192.png',
   '/pwa-512x512.png',
