@@ -860,23 +860,6 @@ html[data-bg="night"] .reset-week.active {
   text-decoration: underline;
 }
 
-.user-badge {
-  display: flex;
-  align-items: center;
-  max-width: 120px;
-  height: 42px;
-  padding: 0 14px;
-  border: 1px solid rgba(255, 255, 255, 0.6);
-  border-radius: 16px;
-  background: rgba(255, 255, 255, 0.2);
-  color: #334155;
-  font-size: 0.85rem;
-  font-weight: 600;
-  overflow: hidden;
-  white-space: nowrap;
-  text-overflow: ellipsis;
-}
-
 .header-action.logout {
   padding: 12px 18px;
 }
