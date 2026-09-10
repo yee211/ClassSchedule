@@ -1,12 +1,26 @@
-# 序时 (ClassSchedule) 📅✨
+# 📅 时序 (ClassSchedule)
 
-> 现代化智能课表管理与可视化系统 —— 液态玻璃质感 · 轻量视频壁纸 · 日夜模式 · Excel 课表 AI 智能解析（失败自动回退本地解析）。
+> **「时序如流，亦有星辰守望」** —— 现代化智能课表管理与可视化系统  
+> 物理拟真液态毛玻璃 · 日夜流体动态壁纸 · Excel/AI 双擎解析 · Android/Web 全端自适应
 
 [![FastAPI](https://img.shields.io/badge/FastAPI-0.115+-009688.svg?style=flat-square&logo=fastapi)](https://fastapi.tiangolo.com)
 [![Vue 3](https://img.shields.io/badge/Vue-3.x-4FC08D.svg?style=flat-square&logo=vue.js)](https://vuejs.org)
 [![Vite](https://img.shields.io/badge/Vite-6.x-646CFF.svg?style=flat-square&logo=vite)](https://vitejs.dev)
+[![Capacitor](https://img.shields.io/badge/Capacitor-Android-119EFF.svg?style=flat-square&logo=capacitor)](https://capacitorjs.com)
 [![PostgreSQL](https://img.shields.io/badge/PostgreSQL-17-4169E1.svg?style=flat-square&logo=postgresql)](https://www.postgresql.org)
+[![Release](https://img.shields.io/badge/Release-v2.1.5-brightgreen.svg?style=flat-square)](https://github.com/yee211/ClassSchedule/releases)
 [![License](https://img.shields.io/badge/License-MIT-blue.svg?style=flat-square)](#开源协议)
+
+---
+
+## 🚀 在线体验与客户端下载
+
+| 平台 / 通道 | 访问 / 下载方式 | 说明 |
+| :--- | :--- | :--- |
+| 🌐 **Web 网页版** | [https://api.tanzeng.xyz](https://api.tanzeng.xyz) | 任意现代浏览器秒开，全端自适应，免安装直接体验 |
+| 📱 **Android 客户端 (v2.1.5)** | [🚀 Cloudflare 全球 CDN 极速下载](https://gh-proxy.com/https://raw.githubusercontent.com/yee211/ClassSchedule/main/static/downloads/%E6%97%B6%E5%BA%8F_v2.1.5.apk) | **推荐**，极速 CDN 加速，下载文件名保存为 `时序_v2.1.5.apk` |
+| 📱 **Android 客户端备用** | [🔗 官方服务器直链下载](https://api.tanzeng.xyz/downloads/%E6%97%B6%E5%BA%8F_v2.1.5.apk) | 官方源站直链通道 |
+| 📱 **Android 永久最新直链** | [⚡ 时序.apk 永久最新版](https://api.tanzeng.xyz/downloads/%E6%97%B6%E5%BA%8F.apk) | 始终指向最新稳定构建版 |
 
 ---
 
@@ -37,6 +51,11 @@
 - **弹性周次选择器**：支持点击周次快速切换预览、一键“回到本周”、单双周过滤、跨节连堂智能合并。
 - **课程自由编辑**：支持顶部快速加课，可视化设置课程名称、教师、教室、星期、起止节次、周次范围及自定义颜色。
 
+### 5. 📱 Android 原生与 Web/PWA 多端深度适配解耦
+- **同一套代码，双端精准分流**：
+  - 🌐 **Web 网页端**：浏览器秒开，无多余倒计时弹窗；版本更新在云端热更生效，打开即用。
+  - 📱 **Android 原生端**：Capacitor 容器封装，配有「时序如流，亦有星辰守望」开屏画面与专属时钟桌面图标；应用内集成静默检测与升级弹窗，支持一键极速下载安装。
+
 ---
 
 ## 🛠️ 技术架构
@@ -48,14 +67,22 @@ ClassSchedule/
 │   ├── auth.py           # PBKDF2 密码哈希与 JWT 签发校验
 │   ├── db.py             # PostgreSQL 连接、表结构、就地迁移与种子数据
 │   ├── main.py           # RESTful API 路由与静态资源托管
-│   └── parser.py         # 本地确定性 Excel 解析（AI 失败时的兜底链路）
+│   ├── parser.py         # 本地确定性 Excel 解析（AI 失败时的兜底链路）
+│   └── routers/          # 业务路由分发（课表管理、移动端更新接口）
 ├── frontend/             # Vue 3 前端工程
 │   ├── src/
 │   │   ├── App.vue       # 课表主界面、交互控制与弹窗系统
 │   │   ├── main.js       # 前端入口
-│   │   └── style.css     # 液态玻璃核心光学变量与全局样式
+│   │   ├── style.css     # 液态毛玻璃核心光学变量与全局样式
+│   │   └── utils/        # 平台环境检测 (isNative) 与版本配置
+│   ├── android/          # Capacitor 原生 Android 封装工程
 │   └── vite.config.js    # Vite 配置文件与 API 反向代理
-├── scripts/              # 辅助维护脚本
+├── static/
+│   └── downloads/        # 移动端安装包分发目录 (时序_v*.apk, 时序.apk, ClassSchedule.apk)
+├── data/
+│   └── app_version.json  # 移动端版本分发与热更元数据
+├── scripts/              # 自动化发布与维护脚本
+│   ├── release.py        # 一键版本发布与原生 APK 打包流水线
 │   ├── setup_database.py # 数据库初始化检查脚本
 │   └── compare_parse.py  # AI 与本地解析结果对照回归脚本
 ├── deploy/               # 生产容器化部署（Dockerfile + docker-compose + .env）
@@ -129,7 +156,21 @@ npm install
 npm run android:build
 ```
 
-调试 APK 输出到 `frontend/android/app/build/outputs/apk/debug/app-debug.apk`。发布版本还需在 Android Studio 中配置签名并生成 release APK/AAB。
+调试 APK 输出到 `frontend/android/app/build/outputs/apk/debug/app-debug.apk`。
+
+### 6. 一键自动化发版流水线（推荐）
+
+项目内置自动化构建与发版流水线脚本，只需一条命令即可自动完成前端构建、Capacitor 资源注入、Gradle 原生打包、四处版本号强一致同步与分发包复制：
+
+```bash
+python scripts/release.py <版本号, 如 2.1.5> <版本代码, 如 7> "更新日志1" "更新日志2" ...
+```
+
+脚本将自动生成：
+- `static/downloads/时序_v{version}.apk`（带版本号专属安装包）
+- `static/downloads/时序.apk`（永久最新稳定版）
+- `static/downloads/ClassSchedule.apk`（历史兼容包）
+- 自动更新 `data/app_version.json` 的版本元数据与 URL 编码下载直链。
 
 ---
 
@@ -229,6 +270,7 @@ python scripts/backup_database.py restore backups/classschedule-YYYYMMDD-HHMMSS.
 | `PUT` | `/api/courses/{id}` | ✅ | 更新指定课程信息 |
 | `DELETE`| `/api/courses/{id}` | ✅ | 删除指定课程 |
 | `POST` | `/api/import` | ✅ | 上传 Excel 课表（`.xlsx` / `.xlsm`）解析入库；同一学期重复导入为幂等覆盖 |
+| `GET` | `/api/app/version` | — | 移动端版本检测与更新直链下发接口 |
 
 `POST /api/import` 除 `file` 外还接受 `start_date` / `end_date` 表单字段（`YYYY-MM-DD`），用于推算周次日期轴；响应体中的 `engine` 标识本次实际生效的解析链路（`ai` 或 `xlsx-fallback(<原因>)`）。
 
