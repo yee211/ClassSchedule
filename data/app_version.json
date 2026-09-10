@@ -1,12 +1,12 @@
 {
-  "versionCode": 3,
-  "versionName": "2.1.1",
+  "versionCode": 4,
+  "versionName": "2.1.2",
   "minVersionCode": 1,
-  "title": "全新版本 v2.1.1",
+  "title": "发现新版本 v2.1.2",
   "changelog": [
-    "新增精美开屏二次元插画与 3 秒倒计时跳过",
-    "全面提升启动视觉与过渡平滑度",
-    "持续优化应用内更新提醒机制"
+    "全新顶栏快捷「检查更新」按钮",
+    "接入 Cloudflare 全球 CDN 极速下载通道（提速至数 MB/s）",
+    "优化 12 小时稍后提醒冷却机制与启动过渡"
   ],
   "downloadUrl": "https://gh-proxy.com/https://raw.githubusercontent.com/yee211/ClassSchedule/main/static/downloads/ClassSchedule.apk",
   "backupDownloadUrl": "https://api.tanzeng.xyz/downloads/ClassSchedule.apk",
