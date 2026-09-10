@@ -1,4 +1,4 @@
-const CACHE_NAME = 'jianke-cache-v3';
+const CACHE_NAME = 'jianke-cache-v4';
 
 const STATIC_PRECACHE = [
   '/',

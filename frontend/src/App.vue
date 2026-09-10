@@ -73,7 +73,6 @@ const semesterSaving = ref(false);
 const pwaHelpOpen = ref(false);
 const canNativeInstall = ref(false);
 const isPwaInstalled = ref(false);
-let deferredInstallPrompt = null;
 
 function detectInstalledPwa() {
   return window.matchMedia('(display-mode: standalone)').matches
@@ -81,14 +80,11 @@ function detectInstalledPwa() {
     || window.navigator.standalone === true;
 }
 
-function handleInstallPrompt(event) {
-  event.preventDefault();
-  deferredInstallPrompt = event;
-  canNativeInstall.value = true;
+function syncInstallPrompt() {
+  canNativeInstall.value = Boolean(window.__jiankeInstallPrompt);
 }
 
 function handleAppInstalled() {
-  deferredInstallPrompt = null;
   canNativeInstall.value = false;
   isPwaInstalled.value = true;
   pwaHelpOpen.value = false;
@@ -97,6 +93,7 @@ function handleAppInstalled() {
 
 function openPwaHelp() {
   isPwaInstalled.value = detectInstalledPwa();
+  syncInstallPrompt();
   pwaHelpOpen.value = true;
 }
 
@@ -107,17 +104,18 @@ async function triggerInstallPwa() {
     return;
   }
 
-  if (deferredInstallPrompt) {
+  const promptEvent = window.__jiankeInstallPrompt;
+  if (promptEvent) {
     try {
-      const promptEvent = deferredInstallPrompt;
       await promptEvent.prompt();
       const choice = await promptEvent.userChoice;
-      if (choice && choice.outcome === 'accepted') {
-        notify('正在添加到桌面…');
-      }
-      deferredInstallPrompt = null;
+      window.__jiankeInstallPrompt = null;
       canNativeInstall.value = false;
-      pwaHelpOpen.value = false;
+      if (choice && choice.outcome === 'accepted') {
+        notify('已确认安装，请等待浏览器添加到桌面');
+      } else {
+        notify('已取消添加');
+      }
       return;
     } catch (e) {
       console.warn('Native install prompt failed:', e);
@@ -433,9 +431,10 @@ function toggleNightMode() {
 onMounted(async () => {
   document.documentElement.setAttribute('data-bg', bgMode.value);
   window.addEventListener('auth:expired', logout);
-  window.addEventListener('beforeinstallprompt', handleInstallPrompt);
-  window.addEventListener('appinstalled', handleAppInstalled);
+  window.addEventListener('pwa:install-ready', syncInstallPrompt);
+  window.addEventListener('pwa:installed', handleAppInstalled);
   isPwaInstalled.value = detectInstalledPwa();
+  syncInstallPrompt();
   if (getToken()) {
     try {
       user.value = await authApi.me();
@@ -450,8 +449,8 @@ onMounted(async () => {
 
 onUnmounted(() => {
   window.removeEventListener('auth:expired', logout);
-  window.removeEventListener('beforeinstallprompt', handleInstallPrompt);
-  window.removeEventListener('appinstalled', handleAppInstalled);
+  window.removeEventListener('pwa:install-ready', syncInstallPrompt);
+  window.removeEventListener('pwa:installed', handleAppInstalled);
   window.clearInterval(importTimer);
 });
 </script>
