@@ -11,15 +11,10 @@ const emit = defineEmits([
   'upload',
   'logout',
   'toggle-night-mode',
-  'change-wallpaper',
 ]);
 
 function onUpload(event) {
   emit('upload', event);
-}
-
-function onWallpaperChange(event) {
-  emit('change-wallpaper', event);
 }
 </script>
 
@@ -53,12 +48,6 @@ function onWallpaperChange(event) {
         <span aria-hidden="true">↑</span>
         <span class="action-text">上传课表</span>
         <span class="action-text-short">导入</span>
-      </label>
-      <label class="header-action wallpaper-btn uiverse-button" title="更换背景壁纸">
-        <input type="file" accept="image/*" @change="onWallpaperChange">
-        <span aria-hidden="true">🖼️</span>
-        <span class="action-text">换壁纸</span>
-        <span class="action-text-short">壁纸</span>
       </label>
       <span class="user-badge" v-if="user" :title="user.email">{{ user.username }}</span>
       <button class="header-action logout uiverse-button" type="button" title="退出登录" @click="emit('logout')">退出</button>

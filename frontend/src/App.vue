@@ -300,65 +300,8 @@ function toggleNightMode() {
   notify(bgMode.value === 'night' ? '已开启黑夜模式' : '已关闭黑夜模式');
 }
 
-// 壁纸与移动端适配
-const customWallpaper = ref(localStorage.getItem('schedule_custom_wallpaper') || '');
-const isMobile = ref(false);
-
-function compressImage(src, callback) {
-  const img = new Image();
-  img.onload = () => {
-    const canvas = document.createElement('canvas');
-    const maxDim = 1920;
-    let width = img.width;
-    let height = img.height;
-    if (width > maxDim || height > maxDim) {
-      if (width > height) {
-        height = Math.round((height * maxDim) / width);
-        width = maxDim;
-      } else {
-        width = Math.round((width * maxDim) / height);
-        height = maxDim;
-      }
-    }
-    canvas.width = width;
-    canvas.height = height;
-    const ctx = canvas.getContext('2d');
-    ctx.drawImage(img, 0, 0, width, height);
-    callback(canvas.toDataURL('image/jpeg', 0.85));
-  };
-  img.src = src;
-}
-
-function handleWallpaperChange(event) {
-  const file = event.target.files?.[0];
-  if (!file) return;
-  if (!file.type.startsWith('image/')) {
-    notify('请选择图片文件');
-    return;
-  }
-  const reader = new FileReader();
-  reader.onload = (e) => {
-    compressImage(e.target.result, (compressed) => {
-      customWallpaper.value = compressed;
-      try {
-        localStorage.setItem('schedule_custom_wallpaper', compressed);
-      } catch {
-        console.warn('localStorage storage limit reached');
-      }
-      notify('背景壁纸已更新！');
-    });
-  };
-  reader.readAsDataURL(file);
-}
-
-function checkMobile() {
-  isMobile.value = window.innerWidth <= 768 || /Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
-}
-
 // 生命周期
 onMounted(async () => {
-  checkMobile();
-  window.addEventListener('resize', checkMobile);
   document.documentElement.setAttribute('data-bg', bgMode.value);
   window.addEventListener('auth:expired', logout);
   if (getToken()) {
@@ -374,20 +317,12 @@ onMounted(async () => {
 });
 
 onUnmounted(() => {
-  window.removeEventListener('resize', checkMobile);
   window.removeEventListener('auth:expired', logout);
 });
 </script>
 
 <template>
-  <div
-    v-if="customWallpaper"
-    class="custom-wallpaper-bg"
-    :style="{ backgroundImage: `url(${customWallpaper})` }"
-    aria-hidden="true"
-  ></div>
   <iframe
-    v-else-if="!isMobile"
     class="wallpaper-background"
     src="/wallpaper/index.html"
     title="动态壁纸背景"
@@ -411,7 +346,6 @@ onUnmounted(() => {
       @upload="upload"
       @logout="logout"
       @toggle-night-mode="toggleNightMode"
-      @change-wallpaper="handleWallpaperChange"
     />
 
     <ScheduleToolbar
