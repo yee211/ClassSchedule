@@ -150,6 +150,12 @@ button, input, select {
   transition: filter 0.35s ease;
 }
 
+@media (max-width: 768px), (orientation: portrait) {
+  .video-wallpaper {
+    object-position: 25% center;
+  }
+}
+
 html[data-bg="night"] .video-wallpaper {
   filter: brightness(0.38) saturate(0.82);
 }
