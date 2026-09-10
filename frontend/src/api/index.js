@@ -4,6 +4,11 @@
 
 const TOKEN_KEY = 'token';
 const ACTIVE_SCHEDULE_KEY = 'active_schedule_id';
+const API_BASE_URL = (import.meta.env.VITE_API_BASE_URL || '').replace(/\/$/, '');
+
+function apiUrl(path) {
+  return `${API_BASE_URL}${path}`;
+}
 
 export function getToken() {
   return localStorage.getItem(TOKEN_KEY);
@@ -44,7 +49,7 @@ export async function api(url, options = {}) {
 
   let response;
   try {
-    response = await fetch(url, { ...options, headers });
+    response = await fetch(apiUrl(url), { ...options, headers });
   } catch (error) {
     if (error?.name === 'TimeoutError' || error?.name === 'AbortError') {
       throw new Error('请求超时，服务端可能仍在处理，请稍后刷新课表确认');

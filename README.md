@@ -113,6 +113,24 @@ npm run dev
 ```
 打开浏览器访问 `http://localhost:5173`。Vite 会将 `/api` 请求自动反向代理至后端 `8000` 端口。
 
+### 5. 构建 Android WebView APK
+
+Android 版使用 Capacitor 封装 Vue 前端，后端仍运行在服务器。先在 `frontend/.env.production.local` 中填写线上 HTTPS 地址：
+
+```env
+VITE_API_BASE_URL=https://你的后端域名
+```
+
+安装 Android Studio（包含 Android SDK 36）并配置好 `ANDROID_HOME` 后执行：
+
+```bash
+cd frontend
+npm install
+npm run android:build
+```
+
+调试 APK 输出到 `frontend/android/app/build/outputs/apk/debug/app-debug.apk`。发布版本还需在 Android Studio 中配置签名并生成 release APK/AAB。
+
 ---
 
 ## 📦 生产构建与单服务托管

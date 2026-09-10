@@ -18,6 +18,11 @@ class Settings:
     auth_rate_limit: int = int(os.getenv("AUTH_RATE_LIMIT", "10"))
     auth_rate_window_seconds: int = int(os.getenv("AUTH_RATE_WINDOW_SECONDS", "300"))
     trust_proxy_headers: bool = os.getenv("TRUST_PROXY_HEADERS", "false").lower() == "true"
+    cors_origins: tuple[str, ...] = tuple(
+        origin.strip()
+        for origin in os.getenv("CORS_ORIGINS", "https://localhost,http://localhost,capacitor://localhost").split(",")
+        if origin.strip()
+    )
 
     def validate(self) -> None:
         if self.max_upload_bytes < 1024 or self.max_upload_bytes > 50 * 1024 * 1024:

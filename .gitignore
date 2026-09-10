@@ -20,6 +20,10 @@ frontend/dist/
 frontend/.npm-cache/
 .vite/
 frontend/.vite/
+frontend/android/.gradle/
+frontend/android/app/build/
+frontend/android/build/
+frontend/android/local.properties
 
 # Temp & build scratch
 tmp/
