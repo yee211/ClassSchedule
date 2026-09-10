@@ -5,7 +5,8 @@ defineProps({
   authForm: { type: Object, required: true },
   authError: { type: String, default: '' },
   authLoading: { type: Boolean, default: false },
-  appVersion: { type: String, default: '2.1.1' },
+  appVersion: { type: String, default: '2.1.3' },
+  isNative: { type: Boolean, default: false },
 });
 
 const emit = defineEmits([
@@ -78,9 +79,11 @@ function switchMode(mode) {
         </template>
       </p>
       <div class="auth-version-bar">
-        <span>序时 v{{ appVersion }}</span>
-        <span class="auth-version-sep">·</span>
-        <button type="button" class="auth-check-btn" @click="emit('check-update')">检查更新</button>
+        <span>序时 {{ isNative ? `App v${appVersion}` : '网页版' }}</span>
+        <template v-if="isNative">
+          <span class="auth-version-sep">·</span>
+          <button type="button" class="auth-check-btn" @click="emit('check-update')">检查更新</button>
+        </template>
       </div>
     </section>
   </div>

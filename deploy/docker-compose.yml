@@ -43,6 +43,8 @@ services:
       - ../data:/app/data
       # 静态文件目录挂载（APK 下载包与图片资源）
       - ../static:/app/static
+      # 前端构建产物挂载（网页端直出，git pull 后无需重建镜像即可实时热更生效）
+      - ../frontend/dist:/app/frontend/dist
     ports:
       # 仅绑定本机回环，由外层反向代理（如 Nginx）统一对外暴露
       - "127.0.0.1:8010:8000"

@@ -38,8 +38,12 @@ import {
   CURRENT_VERSION_NAME,
   checkAppUpdate,
   ignoreUpdateVersion,
+  isNativePlatform,
   openDownloadUrl,
 } from './utils/version.js';
+
+// 检测运行环境：Android 原生 App vs 网页浏览器
+const isNative = ref(isNativePlatform());
 
 // 开屏状态（3秒停留 + 跳过）
 const showSplash = ref(true);
@@ -386,8 +390,14 @@ function toggleNightMode() {
   notify(bgMode.value === 'night' ? '已开启黑夜模式' : '已关闭黑夜模式');
 }
 
-// 应用更新控制
+// 应用更新控制（仅在 Android 原生 App 内弹窗推送）
 async function handleCheckUpdate(silent = false) {
+  if (!isNative.value) {
+    if (!silent) {
+      notify('网页端已连接云端实时更新，刷新页面即可获取最新内容');
+    }
+    return;
+  }
   try {
     const result = await checkAppUpdate(silent);
     if (result.hasUpdate) {
@@ -421,7 +431,9 @@ function onIgnoreUpdate() {
 onMounted(async () => {
   document.documentElement.setAttribute('data-bg', bgMode.value);
   window.addEventListener('auth:expired', logout);
-  handleCheckUpdate(true);
+  if (isNative.value) {
+    handleCheckUpdate(true);
+  }
   if (getToken()) {
     try {
       user.value = await authApi.me();
@@ -470,6 +482,7 @@ onUnmounted(() => {
       :schedule="schedule"
       :bg-mode="bgMode"
       :app-version="CURRENT_VERSION_NAME"
+      :is-native="isNative"
       @delete-schedule="deleteSchedule"
       @add-course="openEditor()"
       @upload="upload"
@@ -508,6 +521,7 @@ onUnmounted(() => {
     :auth-error="authError"
     :auth-loading="authLoading"
     :app-version="CURRENT_VERSION_NAME"
+    :is-native="isNative"
     @submit="submitAuth"
     @update:auth-mode="authMode = $event"
     @clear-error="authError = ''"
@@ -559,8 +573,9 @@ onUnmounted(() => {
     @delete="deleteSchedule"
   />
 
-  <!-- 版本升级提示模态弹窗 -->
+  <!-- 版本升级提示模态弹窗（仅在 Android 原生 App 内展示推送） -->
   <UpdateModal
+    v-if="isNative"
     :open="updateModalOpen"
     :update-info="updateInfo"
     :current-version="CURRENT_VERSION_NAME"

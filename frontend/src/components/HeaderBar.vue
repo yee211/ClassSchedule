@@ -5,7 +5,8 @@ defineProps({
   user: { type: Object, default: null },
   schedule: { type: Object, default: null },
   bgMode: { type: String, default: 'transparent' },
-  appVersion: { type: String, default: '2.0.0' },
+  appVersion: { type: String, default: '2.1.3' },
+  isNative: { type: Boolean, default: false },
 });
 
 const emit = defineEmits([
@@ -59,6 +60,7 @@ onUnmounted(() => {
         <span class="action-text-short">导入</span>
       </label>
       <button
+        v-if="isNative"
         class="header-action uiverse-button"
         type="button"
         title="检查更新"

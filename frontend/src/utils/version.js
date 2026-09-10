@@ -1,18 +1,28 @@
+import { Capacitor } from '@capacitor/core';
 import { appApi } from '../api/index.js';
 
 export const CURRENT_VERSION_NAME = '2.1.3';
 export const CURRENT_VERSION_CODE = 5;
+
+// 判断当前是否运行在 Android 原生客户端环境
+export const isNativePlatform = () => Capacitor.isNativePlatform();
 
 const IGNORED_VERSION_KEY = 'ignored_update_version_code';
 const IGNORED_TIME_KEY = 'ignored_update_time';
 const IGNORE_COOLDOWN_MS = 12 * 60 * 60 * 1000; // 稍后提醒冷却时间：12 小时
 
 /**
- * 检查应用是否有新版本
+ * 检查应用是否有新版本（仅在 Android 原生 App 内弹窗推送）
+ * 网页端通过浏览器直接加载云端最新代码，绝不推送 APK 下载弹窗
  * @param {boolean} silent 是否为静默检查（如 App 启动时）
- * @returns {Promise<{ hasUpdate: boolean, updateInfo?: object, reason?: string, currentVersion?: string }>}
+ * @returns {Promise<{ hasUpdate: boolean, updateInfo?: object, reason?: string, currentVersion?: string, isWeb?: boolean }>}
  */
 export async function checkAppUpdate(silent = false) {
+  // 网页端直接更新，无需也绝不弹窗提醒下载 APK
+  if (!isNativePlatform()) {
+    return { hasUpdate: false, isWeb: true, currentVersion: CURRENT_VERSION_NAME };
+  }
+
   try {
     const remote = await appApi.getVersion();
     if (!remote || typeof remote.versionCode !== 'number') {
@@ -70,11 +80,8 @@ export function clearIgnoredUpdate() {
  */
 export function openDownloadUrl(url) {
   if (!url) return;
-  // 在 Capacitor Android 原生环境下，_system 会直接调用系统默认浏览器打开下载
-  // 在普通 Web 浏览器下，打开新标签页下载
   const win = window.open(url, '_system');
   if (!win || win.closed || typeof win.closed === 'undefined') {
-    // 降级方案
     const a = document.createElement('a');
     a.href = url;
     a.target = '_blank';
