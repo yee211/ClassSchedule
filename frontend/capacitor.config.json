@@ -2,6 +2,11 @@
   "appId": "io.github.yee211.classschedule",
   "appName": "简课",
   "webDir": "dist",
+  "plugins": {
+    "CapacitorHttp": {
+      "enabled": true
+    }
+  },
   "android": {
     "allowMixedContent": false
   }
