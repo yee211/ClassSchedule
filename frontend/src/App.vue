@@ -169,9 +169,8 @@ async function load(preferredId = null) {
       const savedId = getActiveScheduleId();
       const savedSchedule = list.find(item => item.id === savedId);
 
-      // 仅当上次记录的课表在当前仍然有效时才保持；
-      // 若上次看的是历史学期，关闭后重新打开必须定位到当前学期！
-      if (savedSchedule && isScheduleActiveToday(savedSchedule)) {
+      // 若用户曾主动选择过某个学期（无论是否包含今天），优先保持用户的选择
+      if (savedSchedule) {
         selected = savedSchedule;
       } else {
         selected = activeSchedule || list[0];
@@ -194,13 +193,14 @@ async function load(preferredId = null) {
 }
 
 // 切换当前课表
-function selectSchedule(event) {
-  schedule.value = schedules.value.find(item => item.id === Number(event.target.value)) || null;
-  if (schedule.value) {
-    setActiveScheduleId(schedule.value.id);
-  }
-  const totalWeeks = scheduleWeekCount(schedule.value);
-  currentWeek.value = termWeek(schedule.value?.start_date, totalWeeks, schedule.value);
+function selectSchedule(payload) {
+  const targetId = typeof payload === 'object' && payload?.target ? Number(payload.target.value) : Number(payload);
+  const found = schedules.value.find(item => item.id === targetId);
+  if (!found) return;
+  schedule.value = found;
+  setActiveScheduleId(found.id);
+  const totalWeeks = scheduleWeekCount(found);
+  currentWeek.value = termWeek(found.start_date, totalWeeks, found);
   week.value = currentWeek.value;
 }
 
@@ -491,6 +491,7 @@ onUnmounted(() => {
     />
 
     <ScheduleGrid
+      :key="schedule?.id"
       :schedule="schedule"
       :week="week"
       :loading="loading"

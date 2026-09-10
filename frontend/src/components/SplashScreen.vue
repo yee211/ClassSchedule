@@ -59,7 +59,7 @@ onUnmounted(() => {
         <span class="brand-dot"></span>
         <strong>序时</strong>
       </div>
-      <p class="splash-slogan">时光有秩 · 岁律清明</p>
+      <p class="splash-slogan">时序如流 · 亦有星辰守望</p>
     </div>
   </div>
 </template>
