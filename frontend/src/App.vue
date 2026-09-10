@@ -434,36 +434,65 @@ onUnmounted(() => {
 
 .term-select-wrap {
   position: relative;
-  display: block;
+  display: inline-flex;
+  align-items: center;
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.65);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid rgba(255, 255, 255, 0.8);
+  box-shadow: 0 2px 8px rgba(50, 75, 110, 0.06), inset 0 1px 0.5px #fff;
+  padding: 3px 12px;
+  max-width: 100%;
 }
 
 .term-select-wrap select {
-  max-width: min(360px, 38vw);
-  padding: 2px 28px 2px 0;
+  max-width: min(360px, 60vw);
+  padding: 2px 24px 2px 0;
   border: 0;
   outline: 0;
   appearance: none;
   background: transparent;
-  color: #172033;
+  color: #0f172a;
   font: inherit;
-  font-size: 1.25rem;
+  font-size: 1.15rem;
   font-weight: 700;
   cursor: pointer;
 }
 
+.term-select-wrap select option {
+  color: #0f172a;
+  background: #ffffff;
+}
+
 .term-select-wrap i {
   position: absolute;
-  right: 4px;
+  right: 10px;
   top: 50%;
-  color: #64748b;
+  color: #475569;
   font-style: normal;
   pointer-events: none;
   transform: translateY(-55%);
+  font-weight: bold;
 }
 
-html[data-bg="night"] .term-select-wrap select,
-html[data-bg="night"] .term-select-wrap i {
+html[data-bg="night"] .term-select-wrap {
+  background: rgba(15, 23, 42, 0.65);
+  border-color: rgba(148, 163, 184, 0.32);
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.3), inset 0 1px 0.5px rgba(255, 255, 255, 0.15);
+}
+
+html[data-bg="night"] .term-select-wrap select {
   color: #f8fafc;
+}
+
+html[data-bg="night"] .term-select-wrap select option {
+  color: #f8fafc;
+  background: #0f172a;
+}
+
+html[data-bg="night"] .term-select-wrap i {
+  color: #94a3b8;
 }
 
 .week-menu {
@@ -907,48 +936,81 @@ html[data-bg="night"] .user-badge {
 }
 
 @media (max-width: 680px) {
-  .toolbar {
-    flex-wrap: wrap;
-    gap: 12px;
-  }
-  .toolbar > div:first-child {
+  .term-picker {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
     width: 100%;
+    gap: 8px;
+  }
+  .term-picker p {
+    margin: 0;
+    font-size: 0.76rem;
+    color: #94a3b8;
+    white-space: nowrap;
+  }
+  .term-select-wrap {
+    padding: 2px 8px;
+    max-width: calc(100vw - 110px);
+  }
+  .term-select-wrap select {
+    max-width: calc(100vw - 136px);
+    font-size: 0.95rem;
+    padding: 2px 20px 2px 0;
   }
   .week-picker {
     width: 100%;
-    gap: 4px;
-  }
-  .term-select-wrap select {
-    max-width: calc(100vw - 52px);
-    font-size: 1.06rem;
+    gap: 5px;
+    justify-content: space-between;
   }
   .week-menu {
     flex: 1;
+    min-width: 0;
+  }
+  .week-trigger {
+    height: 38px;
+    padding: 4px 8px;
+    border-radius: 12px;
+  }
+  .week-trigger b {
+    font-size: 0.82rem;
+  }
+  .week-trigger small {
+    font-size: 0.62rem;
   }
   .week-menu-panel {
     right: auto;
     left: 0;
-    width: min(460px, calc(100vw - 28px));
+    width: min(340px, calc(100vw - 24px));
+    padding: 12px;
   }
   .week-menu-grid {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-    gap: 8px;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 6px;
   }
   .week-option {
-    min-height: 62px;
+    min-height: 52px;
+    padding: 6px 4px;
+    border-radius: 10px;
+  }
+  .week-option b {
+    font-size: 0.78rem;
+  }
+  .week-option small {
+    font-size: 0.58rem;
   }
   .reset-week {
-    min-width: 68px!important;
-    padding: 0 5px!important;
+    height: 38px;
+    min-width: 56px !important;
+    padding: 0 6px !important;
+    font-size: 0.78rem;
+    border-radius: 12px;
   }
-  .grid {
-    grid-template-rows: 58px repeat(10, 68px)!important;
-  }
-  .user-badge {
-    display: none;
-  }
-  .header-action.logout {
-    padding: 8px 12px;
+  .week-nav {
+    height: 38px;
+    width: 34px;
+    flex: 0 0 34px;
+    border-radius: 12px;
   }
 }
 </style>
