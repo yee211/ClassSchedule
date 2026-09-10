@@ -59,6 +59,8 @@ const importError = ref('');
 const importEngine = ref('');
 const importStartDate = ref('');
 const importEndDate = ref('');
+const importElapsed = ref(0);
+let importTimer = null;
 
 // 计算属性
 const weekOptions = computed(() =>
@@ -268,6 +270,9 @@ async function startImport() {
   importSetup.value = false;
   importing.value = true;
   importError.value = '';
+  importElapsed.value = 0;
+  window.clearInterval(importTimer);
+  importTimer = window.setInterval(() => { importElapsed.value += 1; }, 1000);
   const body = new FormData();
   body.append('file', importFile.value);
   body.append('start_date', importStartDate.value);
@@ -286,6 +291,8 @@ async function startImport() {
     notify(error.message);
   } finally {
     importing.value = false;
+    window.clearInterval(importTimer);
+    importTimer = null;
   }
 }
 
@@ -318,17 +325,22 @@ onMounted(async () => {
 
 onUnmounted(() => {
   window.removeEventListener('auth:expired', logout);
+  window.clearInterval(importTimer);
 });
 </script>
 
 <template>
-  <iframe
-    class="wallpaper-background"
-    src="/wallpaper/index.html"
-    title="动态壁纸背景"
+  <video
+    class="video-wallpaper"
+    src="/wallpaper.mp4"
+    poster="/wallpaper-fallback.jpg"
+    autoplay
+    muted
+    loop
+    playsinline
+    preload="metadata"
     aria-hidden="true"
-    tabindex="-1"
-  ></iframe>
+  ></video>
   <div class="ambient-canvas" aria-hidden="true">
     <div class="blob blob-1"></div>
     <div class="blob blob-2"></div>
@@ -408,6 +420,7 @@ onUnmounted(() => {
     :import-end-date="importEndDate"
     :import-error="importError"
     :import-engine="importEngine"
+    :import-elapsed="importElapsed"
     @close="importerOpen = false"
     @update:import-start-date="importStartDate = $event"
     @update:import-end-date="importEndDate = $event"
@@ -415,7 +428,7 @@ onUnmounted(() => {
   />
 
   <Transition name="toast">
-    <div v-if="message" class="toast">{{ message }}</div>
+    <div v-if="message" class="toast" role="status" aria-live="polite">{{ message }}</div>
   </Transition>
 </template>
 

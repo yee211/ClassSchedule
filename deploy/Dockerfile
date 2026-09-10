@@ -20,11 +20,12 @@ WORKDIR /app
 COPY requirements.txt ./
 RUN pip install --no-cache-dir -r requirements.txt
 
-# 拷贝后端源码与前端构建产物
+# 拷贝数据库迁移配置与脚本、后端源码与前端构建产物
+COPY alembic.ini ./
+COPY migrations ./migrations
 COPY app ./app
 COPY --from=frontend-builder /app/frontend/dist ./frontend/dist
 
 EXPOSE 8000
 
-CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]
-
+CMD ["sh", "-c", "alembic upgrade head && exec uvicorn app.main:app --host 0.0.0.0 --port 8000"]

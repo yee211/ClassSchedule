@@ -3,20 +3,16 @@ import hmac
 import os
 import secrets
 from datetime import datetime, timedelta, timezone
-from pathlib import Path
-
 import jwt
-from dotenv import load_dotenv
 from fastapi import Depends, HTTPException
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 
-ROOT = Path(__file__).resolve().parent.parent
-load_dotenv(ROOT / ".env")
+from .settings import settings
 
-JWT_SECRET = os.getenv("JWT_SECRET", "dev-insecure-secret-change-me")
+JWT_SECRET = settings.jwt_secret
 JWT_ALGORITHM = "HS256"
 JWT_EXPIRE_MINUTES = int(os.getenv("JWT_EXPIRE_MINUTES", "10080"))
-_ITERATIONS = 100_000
+_ITERATIONS = 600_000
 
 _bearer = HTTPBearer(auto_error=False)
 

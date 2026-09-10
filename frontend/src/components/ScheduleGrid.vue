@@ -67,7 +67,7 @@ function courseStyle(course) {
 </script>
 
 <template>
-  <section class="schedule glass" :class="{ busy: loading }">
+  <section class="schedule glass" :class="{ busy: loading }" aria-label="每周课程表" tabindex="0">
     <div v-if="loading" class="state">正在读取课表…</div>
     <div v-else-if="!schedule" class="state">还没有课表</div>
     <div v-else class="grid" :style="gridStyle">

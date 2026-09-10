@@ -6,6 +6,7 @@ services:
     container_name: classschedule_db
     restart: always
     environment:
+      APP_ENV: production
       POSTGRES_USER: class_schedule
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
       POSTGRES_DB: class_schedule
@@ -28,15 +29,15 @@ services:
       DATABASE_URL: postgresql://class_schedule:${POSTGRES_PASSWORD}@db:5432/class_schedule
       JWT_SECRET: ${JWT_SECRET}
       JWT_EXPIRE_MINUTES: ${JWT_EXPIRE_MINUTES:-10080}
-      DEFAULT_EMAIL: ${DEFAULT_EMAIL:-demo@example.com}
-      DEFAULT_USERNAME: ${DEFAULT_USERNAME:-demo}
-      DEFAULT_PASSWORD: ${DEFAULT_PASSWORD:-demo1234}
       # AI 课表解析（OpenAI 兼容协议）；AI_API_KEY 留空则自动回退本地 Excel 解析
       AI_BASE_URL: ${AI_BASE_URL:-https://api.deepseek.com/v1}
       AI_API_KEY: ${AI_API_KEY:-}
       AI_MODEL: ${AI_MODEL:-deepseek-chat}
-      AI_TIMEOUT_SECONDS: ${AI_TIMEOUT_SECONDS:-120}
+      AI_TIMEOUT_SECONDS: ${AI_TIMEOUT_SECONDS:-45}
       AI_MAX_INPUT_CHARS: ${AI_MAX_INPUT_CHARS:-60000}
+      MAX_UPLOAD_BYTES: ${MAX_UPLOAD_BYTES:-10485760}
+      AUTH_RATE_LIMIT: ${AUTH_RATE_LIMIT:-10}
+      TRUST_PROXY_HEADERS: "true"
     volumes:
       # 数据目录持久化到宿主机（上传的课表文件解析完即删，不再长期留存）
       - ../data:/app/data

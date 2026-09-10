@@ -42,7 +42,15 @@ export async function api(url, options = {}) {
     headers['Authorization'] = `Bearer ${token}`;
   }
 
-  const response = await fetch(url, { ...options, headers });
+  let response;
+  try {
+    response = await fetch(url, { ...options, headers });
+  } catch (error) {
+    if (error?.name === 'TimeoutError' || error?.name === 'AbortError') {
+      throw new Error('请求超时，服务端可能仍在处理，请稍后刷新课表确认');
+    }
+    throw new Error('网络连接失败，请检查网络后重试');
+  }
   let body = {};
   try {
     body = await response.json();
@@ -112,9 +120,13 @@ export const coursesApi = {
 
 export const importerApi = {
   async importFile(formData) {
+    const signal = typeof AbortSignal !== 'undefined' && AbortSignal.timeout
+      ? AbortSignal.timeout(75000)
+      : undefined;
     return api('/api/import', {
       method: 'POST',
       body: formData,
+      signal,
     });
   },
 };

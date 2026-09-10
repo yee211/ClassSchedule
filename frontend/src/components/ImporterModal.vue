@@ -8,6 +8,7 @@ defineProps({
   importEndDate: { type: String, default: '' },
   importError: { type: String, default: '' },
   importEngine: { type: String, default: '' },
+  importElapsed: { type: Number, default: 0 },
 });
 
 const emit = defineEmits([
@@ -31,7 +32,7 @@ const emit = defineEmits([
 
       <div v-if="importing" class="scanner">
         <i></i>
-        <span>正在解析课程信息，AI 识别约需 10~30 秒…</span>
+        <span>{{ importElapsed < 5 ? '正在安全读取工作簿…' : importElapsed < 45 ? `正在识别课程信息… ${importElapsed} 秒` : 'AI 响应较慢，正在准备本地解析兜底…' }}</span>
       </div>
 
       <div v-else-if="importSetup" class="import-setup">

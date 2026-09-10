@@ -1,5 +1,6 @@
 import json
-import shutil
+import logging
+import time
 import uuid
 from datetime import date
 from pathlib import Path
@@ -9,12 +10,15 @@ from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile
 from ..ai import parse_with_ai
 from ..auth import get_current_user
 from ..db import DATA, connect
+from ..excel import validate_excel_container
 from ..parser import parse_excel_schedule
+from ..settings import settings
 
 router = APIRouter(prefix="/api", tags=["import"])
 
 UPLOADS = DATA / "uploads"
 UPLOADS.mkdir(parents=True, exist_ok=True)
+logger = logging.getLogger("classschedule")
 
 
 def parse_schedule_date(value: str, label: str):
@@ -43,9 +47,19 @@ def import_file(
     if suffix not in {".xlsx", ".xlsm", ".xls"}:
         raise HTTPException(400, "仅支持 Excel 课表（.xlsx / .xlsm / .xls）")
     target = UPLOADS / f"{uuid.uuid4().hex}{suffix}"
+    started = time.perf_counter()
     try:
         with target.open("wb") as out:
-            shutil.copyfileobj(file.file, out)
+            total = 0
+            while chunk := file.file.read(1024 * 1024):
+                total += len(chunk)
+                if total > settings.max_upload_bytes:
+                    raise HTTPException(413, f"文件不能超过 {settings.max_upload_bytes // 1024 // 1024} MB")
+                out.write(chunk)
+        try:
+            validate_excel_container(target, suffix)
+        except ValueError as error:
+            raise HTTPException(400, str(error)) from error
         parsed, engine = parse_with_ai(target)
         if not parsed:
             # AI 未配置、超时或识别失败时静默回退到确定性解析，保证导入功能不中断
@@ -85,7 +99,17 @@ def import_file(
                 cursor.executemany("""INSERT INTO courses
                     (schedule_id,name,teacher,room,weekday,start_section,end_section,weeks,color)
                     VALUES(%s,%s,%s,%s,%s,%s,%s,%s::jsonb,%s)""", rows)
-        return {"engine": engine, "imported": len(rows), "schedule_id": schedule["id"], "replaced": replaced}
+        duration_ms = round((time.perf_counter() - started) * 1000)
+        logger.info(json.dumps({
+            "event": "schedule_import",
+            "user_id": user["id"],
+            "engine": engine,
+            "imported": len(rows),
+            "replaced": replaced,
+            "file_bytes": total,
+            "duration_ms": duration_ms,
+        }, ensure_ascii=False))
+        return {"engine": engine, "imported": len(rows), "schedule_id": schedule["id"], "replaced": replaced, "duration_ms": duration_ms}
     finally:
         # 上传文件仅用于本次解析，用完即删，避免 data/uploads 无限堆积
         target.unlink(missing_ok=True)

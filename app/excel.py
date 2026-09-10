@@ -9,6 +9,7 @@
 import csv
 import io
 import re
+import zipfile
 from dataclasses import dataclass, field
 from datetime import date, datetime, time
 from html.parser import HTMLParser
@@ -25,6 +26,30 @@ OLE2_MAGIC = b"\xd0\xcf\x11\xe0\xa1\xb1\x1a\xe1"
 
 # 单表行数上限，防止带大量尾部格式的空表拖垮序列化
 MAX_ROWS_PER_SHEET = 1500
+MAX_OOXML_FILES = 2000
+MAX_OOXML_UNCOMPRESSED_BYTES = 64 * 1024 * 1024
+
+
+def validate_excel_container(path: Path, suffix: str) -> str:
+    """校验真实文件类型，并限制 OOXML 解压规模以避免压缩炸弹。"""
+    kind = detect_format(path)
+    if suffix in {".xlsx", ".xlsm"} and kind != "ooxml":
+        raise ValueError("文件内容与 Excel 扩展名不匹配")
+    if suffix == ".xls" and kind not in {"biff", "ooxml", "html"}:
+        raise ValueError("无法识别为有效的 Excel 文件")
+    if kind == "ooxml":
+        try:
+            with zipfile.ZipFile(path) as archive:
+                entries = archive.infolist()
+                total = sum(item.file_size for item in entries)
+                if len(entries) > MAX_OOXML_FILES or total > MAX_OOXML_UNCOMPRESSED_BYTES:
+                    raise ValueError("Excel 解压后的内容过大")
+                for item in entries:
+                    if item.compress_size and item.file_size / item.compress_size > 200:
+                        raise ValueError("Excel 包含异常压缩内容")
+        except zipfile.BadZipFile as error:
+            raise ValueError("Excel 文件结构已损坏") from error
+    return kind
 
 
 @dataclass

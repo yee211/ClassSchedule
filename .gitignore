@@ -11,6 +11,7 @@ htmlcov/
 # Environment & Local Data
 .env
 data/
+backups/
 
 # Frontend builds & caches
 node_modules/

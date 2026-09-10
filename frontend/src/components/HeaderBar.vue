@@ -23,17 +23,6 @@ function onUpload(event) {
     <div class="brand"><span class="brand-dot"></span><strong>简课</strong></div>
     <div class="top-actions">
       <button
-        class="header-action delete-schedule uiverse-button"
-        type="button"
-        :disabled="!schedule"
-        title="删除课表"
-        @click="emit('delete-schedule')"
-      >
-        <span aria-hidden="true">−</span>
-        <span class="action-text">删除课表</span>
-        <span class="action-text-short">删课</span>
-      </button>
-      <button
         class="header-action uiverse-button"
         type="button"
         title="添加课程"
@@ -49,8 +38,18 @@ function onUpload(event) {
         <span class="action-text">上传课表</span>
         <span class="action-text-short">导入</span>
       </label>
-      <span class="user-badge" v-if="user" :title="user.email">{{ user.username }}</span>
-      <button class="header-action logout uiverse-button" type="button" title="退出登录" @click="emit('logout')">退出</button>
+      <details v-if="user" class="user-menu">
+        <summary class="user-badge" :title="user.email">
+          <span class="user-avatar" aria-hidden="true">{{ user.username?.slice(0, 1)?.toUpperCase() }}</span>
+          <span class="user-name">{{ user.username }}</span>
+          <span aria-hidden="true">⌄</span>
+        </summary>
+        <div class="user-menu-panel glass">
+          <div class="user-menu-meta"><b>{{ user.username }}</b><small>{{ user.email }}</small></div>
+          <button type="button" :disabled="!schedule" @click="emit('delete-schedule')">删除当前课表</button>
+          <button type="button" @click="emit('logout')">退出登录</button>
+        </div>
+      </details>
       <button
         type="button"
         class="night-mode-button"

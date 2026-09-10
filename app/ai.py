@@ -25,7 +25,7 @@ AI_BASE_URL = os.getenv("AI_BASE_URL", "https://api.deepseek.com/v1").rstrip("/"
 AI_API_KEY = os.getenv("AI_API_KEY", "").strip().strip('"').strip("'")
 AI_MODEL = os.getenv("AI_MODEL", "deepseek-chat")
 
-AI_TIMEOUT = float(os.getenv("AI_TIMEOUT_SECONDS", "120"))
+AI_TIMEOUT = min(60.0, max(5.0, float(os.getenv("AI_TIMEOUT_SECONDS", "45"))))
 AI_MAX_INPUT_CHARS = int(os.getenv("AI_MAX_INPUT_CHARS", "60000"))
 
 # 单个 sheet 的行数上限，防止带大量尾部格式的空表拖垮序列化

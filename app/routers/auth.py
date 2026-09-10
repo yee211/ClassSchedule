@@ -1,14 +1,16 @@
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Request
 
 from ..auth import create_token, get_current_user, hash_password, verify_password
 from ..db import connect
+from ..rate_limit import enforce_auth_rate_limit
 from ..schemas import LoginIn, RegisterIn
 
 router = APIRouter(prefix="/api", tags=["auth"])
 
 
 @router.post("/register", status_code=201)
-def register(payload: RegisterIn):
+def register(payload: RegisterIn, request: Request):
+    enforce_auth_rate_limit(request, "register")
     email = payload.email
     username = payload.username.strip()
     if len(username) < 2:
@@ -31,7 +33,8 @@ def register(payload: RegisterIn):
 
 
 @router.post("/login")
-def login(payload: LoginIn):
+def login(payload: LoginIn, request: Request):
+    enforce_auth_rate_limit(request, "login")
     email = payload.email
     with connect() as db:
         user = db.execute(

@@ -1,6 +1,6 @@
 # 简课 (ClassSchedule) 📅✨
 
-> 现代化智能课表管理与可视化系统 —— 优雅透明液态玻璃质感 · 动态 3D WebGL 壁纸底衬 · 日夜模式极速切换 · Excel 课表 AI 智能解析（OpenAI 兼容协议，失败自动回退本地解析）。
+> 现代化智能课表管理与可视化系统 —— 液态玻璃质感 · 轻量视频壁纸 · 日夜模式 · Excel 课表 AI 智能解析（失败自动回退本地解析）。
 
 [![FastAPI](https://img.shields.io/badge/FastAPI-0.115+-009688.svg?style=flat-square&logo=fastapi)](https://fastapi.tiangolo.com)
 [![Vue 3](https://img.shields.io/badge/Vue-3.x-4FC08D.svg?style=flat-square&logo=vue.js)](https://vuejs.org)
@@ -17,8 +17,8 @@
 - **彩色果冻水晶课程卡片**：告别单调纯色块，卡片自带水润通透质感、微光高光内边与文字阴影，并在 Hover 时伴随 Spring 曲线弹性上浮及流光掠影（Fluid Sheen）扫光特效。
 - **色相错开防视觉疲劳**：内置大色相差调色盘，相邻课程色彩智能区分，清晰醒目。
 
-### 2. 🌌 动态 3D WebGL 壁纸与日夜模式联动
-- **原生内嵌动态壁纸**：课表底层无缝集成全屏 Unity WebGL 3D 动态壁纸，支持桌面级视差渲染与音频响应监听。
+### 2. 🌌 轻量视频壁纸与日夜模式联动
+- **低负担动态画面**：使用约 1.28 MB 的 MP4 循环视频，不再运行 WebGL 或加载音频；系统开启“减少动态效果”时自动改用预览静态图。
 - **一键日夜模式切换**：
   - ☀️ **日间模式**：高透光水晶面板，清爽透亮；
   - 🌙 **夜间模式**：自动压暗壁纸亮度（`brightness 0.34`），界面平滑切至深邃深色玻璃面板，保护夜间视力。
@@ -50,7 +50,6 @@ ClassSchedule/
 │   ├── main.py           # RESTful API 路由与静态资源托管
 │   └── parser.py         # 本地确定性 Excel 解析（AI 失败时的兜底链路）
 ├── frontend/             # Vue 3 前端工程
-│   ├── public/wallpaper/ # Unity WebGL 3D 动态壁纸资源
 │   ├── src/
 │   │   ├── App.vue       # 课表主界面、交互控制与弹窗系统
 │   │   ├── main.js       # 前端入口
@@ -96,6 +95,7 @@ source venv/bin/activate
 
 # 安装后端依赖
 pip install -r requirements.txt
+alembic upgrade head
 
 # 复制环境配置文件并填入数据库密码与 JWT 密钥（必需）
 copy .env.example .env
@@ -145,17 +145,16 @@ POSTGRES_ADMIN_URL=postgresql://class_schedule:class_schedule@127.0.0.1:5433/pos
 JWT_SECRET=please-change-this-to-a-long-random-string
 JWT_EXPIRE_MINUTES=10080
 
-# 首次启动创建的默认账号，用于接管升级前的既有课表数据（登录凭证为邮箱）
-DEFAULT_EMAIL=demo@example.com
-DEFAULT_USERNAME=demo
-DEFAULT_PASSWORD=demo1234
-
 # AI 课表解析（OpenAI 兼容协议）
 AI_BASE_URL=https://api.deepseek.com/v1
 AI_API_KEY=
 AI_MODEL=deepseek-chat
-AI_TIMEOUT_SECONDS=120
+AI_TIMEOUT_SECONDS=45
 AI_MAX_INPUT_CHARS=60000
+MAX_UPLOAD_BYTES=10485760
+AUTH_RATE_LIMIT=10
+AUTH_RATE_WINDOW_SECONDS=300
+TRUST_PROXY_HEADERS=false
 ```
 
 切换 AI 厂商只需改 `AI_BASE_URL` 与 `AI_MODEL`：
@@ -180,6 +179,19 @@ AI_MAX_INPUT_CHARS=60000
 推理模型把时间花在隐藏思考 token 上，对本任务无质量收益；且百秒级耗时易超过 Nginx 默认 60s 的 `proxy_read_timeout`，导致生产环境 504。若确需使用慢模型，请同步上调反向代理的 `proxy_read_timeout` 与 `proxy_send_timeout`。
 
 生产容器化部署请改填 [deploy/.env](deploy/.env)，对应变量由 [deploy/docker-compose.yml](deploy/docker-compose.yml) 注入 `app` 服务。
+
+生产环境还必须配置 `APP_ENV=production`。应用会拒绝使用默认 JWT 密钥启动；登录与注册按单实例、单 IP 做基础限流。上传文件默认限制为 10 MB，并校验真实 Excel 格式与 OOXML 解压规模。
+
+### 数据库迁移与备份
+
+每次部署新版前执行 `alembic upgrade head`。生产镜像启动时会自动执行该命令。备份与恢复使用系统中的 `pg_dump` / `pg_restore`：
+
+```bash
+python scripts/backup_database.py backup
+python scripts/backup_database.py restore backups/classschedule-YYYYMMDD-HHMMSS.dump
+```
+
+建议每天执行一次备份、至少保留 7 份，并定期在独立数据库中验证恢复。`backups/` 已加入 `.gitignore`，不要把用户数据提交到仓库。
 
 ---
 

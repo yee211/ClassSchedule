@@ -76,7 +76,7 @@ onUnmounted(() => {
       <h1 v-else>{{ schedule?.term || '我的课表' }}</h1>
     </div>
     <div class="week-picker">
-      <button class="week-nav" aria-label="上一周" @click="prevWeek">‹</button>
+      <button class="week-nav" aria-label="上一周" :disabled="week <= 1" @click="prevWeek">‹</button>
       <div class="week-menu" @click.stop>
         <button class="week-trigger" :aria-expanded="weekMenuOpen" aria-haspopup="listbox" @click="toggleWeekMenu">
           <span><b>第{{ week }}周</b><small>{{ weekRange(schedule?.start_date, week) }}</small></span>
@@ -109,7 +109,7 @@ onUnmounted(() => {
       >
         {{ week === currentWeek ? '本周' : '回到本周' }}
       </button>
-      <button class="week-nav" aria-label="下一周" @click="nextWeek">›</button>
+      <button class="week-nav" aria-label="下一周" :disabled="week >= weekOptions.length" @click="nextWeek">›</button>
     </div>
   </section>
 </template>
