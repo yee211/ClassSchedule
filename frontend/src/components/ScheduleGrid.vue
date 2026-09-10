@@ -79,7 +79,10 @@ function courseStyle(course) {
         v-for="(day, index) in days"
         :key="day"
         class="day"
-        :class="{ 'is-today': isDayToday(schedule.start_date, index + 1, week, schedule) }"
+        :class="{
+          'is-today': isDayToday(schedule.start_date, index + 1, week, schedule),
+          weekend: index >= 5,
+        }"
       >
         <span class="day-date">{{ weekDayNumber(schedule.start_date, index + 1, week) }}</span>
         <b class="day-name">{{ shortDay(day) }}</b>
@@ -96,6 +99,7 @@ function courseStyle(course) {
           v-for="day in 7"
           :key="day"
           class="cell"
+          :class="{ weekend: day > 5 }"
           :style="{ gridColumn: day + 1, gridRow: section + 1 }"
         ></div>
       </template>
@@ -103,6 +107,7 @@ function courseStyle(course) {
         v-for="course in displayCourses"
         :key="course.id"
         class="course"
+        :class="{ weekend: course.weekday > 5 }"
         :style="courseStyle(course)"
         @click="emit('preview-course', course)"
       >

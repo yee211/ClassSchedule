@@ -1272,15 +1272,18 @@ html[data-bg="night"] .user-menu-panel button:hover { background: rgba(255, 255,
     padding: 4px;
     width: 100%;
     box-sizing: border-box;
-    overflow-x: auto;
+    overflow-x: hidden;
     overflow-y: auto;
     -webkit-overflow-scrolling: touch;
   }
   .grid {
-    grid-template-columns: 42px repeat(7, minmax(96px, 1fr));
-    min-width: 714px;
-    width: max(100%, 714px);
+    grid-template-columns: 28px repeat(5, minmax(0, 1fr));
+    min-width: 0;
+    width: 100%;
     position: relative;
+  }
+  .grid > .weekend {
+    display: none;
   }
   .corner, .section {
     position: sticky;
@@ -1373,18 +1376,18 @@ html[data-bg="night"] .user-menu-panel button:hover { background: rgba(255, 255,
     transform: scale(0.97);
   }
   .course-text {
-    font-size: 0.75rem;
-    line-height: 1.15;
+    font-size: clamp(0.58rem, 2.35vw, 0.7rem);
+    line-height: 1.18;
     font-weight: 500;
     text-shadow: 0 1px 2px rgba(0, 0, 0, 0.38);
   }
   .course-name {
-    font-size: 0.76rem;
+    font-size: clamp(0.6rem, 2.4vw, 0.72rem);
     font-weight: 600;
   }
   .course-room,
   .course-teacher {
-    font-size: 0.66rem;
+    font-size: clamp(0.54rem, 2.05vw, 0.64rem);
     line-height: 1.1;
   }
   .fields.three {
