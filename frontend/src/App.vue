@@ -33,12 +33,16 @@ import ImporterModal from './components/ImporterModal.vue';
 import SemesterModal from './components/SemesterModal.vue';
 import AuthModal from './components/AuthModal.vue';
 import UpdateModal from './components/UpdateModal.vue';
+import SplashScreen from './components/SplashScreen.vue';
 import {
   CURRENT_VERSION_NAME,
   checkAppUpdate,
   ignoreUpdateVersion,
   openDownloadUrl,
 } from './utils/version.js';
+
+// 开屏状态（3秒停留 + 跳过）
+const showSplash = ref(true);
 
 // 基础状态
 const week = ref(1);
@@ -436,6 +440,11 @@ onUnmounted(() => {
 </script>
 
 <template>
+  <!-- 开屏二次元壁纸（3秒停留 + 跳过） -->
+  <Transition name="splash-fade">
+    <SplashScreen v-if="showSplash" :duration="3" @finish="showSplash = false" />
+  </Transition>
+
   <video
     class="video-wallpaper"
     src="/wallpaper.mp4"
@@ -562,6 +571,15 @@ onUnmounted(() => {
 </template>
 
 <style>
+.splash-fade-leave-active {
+  transition: opacity 0.45s cubic-bezier(0.4, 0, 0.2, 1), transform 0.45s cubic-bezier(0.4, 0, 0.2, 1);
+  pointer-events: none;
+}
+.splash-fade-leave-to {
+  opacity: 0;
+  transform: scale(1.06);
+}
+
 .sr-only {
   position: absolute;
   width: 1px;

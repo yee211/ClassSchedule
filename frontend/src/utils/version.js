@@ -1,7 +1,7 @@
 import { appApi } from '../api/index.js';
 
-export const CURRENT_VERSION_NAME = '2.1.0';
-export const CURRENT_VERSION_CODE = 2;
+export const CURRENT_VERSION_NAME = '2.1.1';
+export const CURRENT_VERSION_CODE = 3;
 
 const IGNORED_VERSION_KEY = 'ignored_update_version_code';
 
