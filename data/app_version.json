@@ -1,12 +1,11 @@
 {
-  "versionCode": 6,
-  "versionName": "2.1.4",
+  "versionCode": 7,
+  "versionName": "2.1.5",
   "minVersionCode": 1,
-  "title": "发现新版本 v2.1.4",
+  "title": "发现新版本 v2.1.5",
   "changelog": [
-    "更新序时日出山峦高清封面（循时而行，自有序章）",
-    "优化开屏过渡，去除倒计时按钮，支持轻触秒进",
-    "网页端直接进入，彻底移除网页端开屏封面与升级弹窗"
+    "更新「序时」专属正序应用图标",
+    "同步更新 Android 原生与 Web/PWA 全套图标资产"
   ],
   "downloadUrl": "https://gh-proxy.com/https://raw.githubusercontent.com/yee211/ClassSchedule/main/static/downloads/ClassSchedule.apk",
   "backupDownloadUrl": "https://api.tanzeng.xyz/downloads/ClassSchedule.apk",

@@ -3,7 +3,7 @@ import sys
 from PIL import Image, ImageDraw
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-SRC_IMAGE = r"C:/Users/1/.gemini/antigravity/brain/4c87f46a-49aa-432c-bba8-d37f2dac9e55/.user_uploaded/media_1789049778019.jpg"
+SRC_IMAGE = r"C:/Users/1/.gemini/antigravity/brain/4c87f46a-49aa-432c-bba8-d37f2dac9e55/.user_uploaded/media_1789051182312.png"
 RES_DIR = os.path.join(ROOT, "frontend", "android", "app", "src", "main", "res")
 PUB_DIR = os.path.join(ROOT, "frontend", "public")
 
@@ -12,9 +12,9 @@ def create_icons():
     src = Image.open(SRC_IMAGE).convert("RGBA")
     w, h = src.size
 
-    # The user uploaded image has the icon centered at roughly (512, 280)
-    cx, cy = 512, 280
-    half = 197
+    # The user uploaded image has the icon centered at roughly (511, 276)
+    cx, cy = 511, 276
+    half = 198
     crop = src.crop((cx - half, cy - half, cx + half, cy + half))
 
     # Base master 512x512 icon
