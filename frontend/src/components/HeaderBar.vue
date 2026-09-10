@@ -14,7 +14,6 @@ const emit = defineEmits([
   'logout',
   'toggle-night-mode',
   'open-semester-settings',
-  'open-pwa-help',
 ]);
 
 const userMenuRef = ref(null);
@@ -66,7 +65,6 @@ onUnmounted(() => {
         </summary>
         <div class="user-menu-panel glass">
           <div class="user-menu-meta"><b>{{ user.username }}</b><small>{{ user.email }}</small></div>
-          <button type="button" @click="emit('open-pwa-help'); userMenuRef?.removeAttribute('open')">📱 添加到手机桌面</button>
           <button type="button" :disabled="!schedule" @click="emit('open-semester-settings'); userMenuRef?.removeAttribute('open')">学期与日期设置</button>
           <button type="button" :disabled="!schedule" @click="emit('delete-schedule'); userMenuRef?.removeAttribute('open')">删除当前课表</button>
           <button type="button" @click="emit('logout')">退出登录</button>

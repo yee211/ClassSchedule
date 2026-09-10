@@ -31,7 +31,6 @@ import CoursePreviewModal from './components/CoursePreviewModal.vue';
 import CourseEditorModal from './components/CourseEditorModal.vue';
 import ImporterModal from './components/ImporterModal.vue';
 import SemesterModal from './components/SemesterModal.vue';
-import PwaHelpModal from './components/PwaHelpModal.vue';
 import AuthModal from './components/AuthModal.vue';
 
 // 基础状态
@@ -69,61 +68,6 @@ let importTimer = null;
 
 const semesterModalOpen = ref(false);
 const semesterSaving = ref(false);
-
-const pwaHelpOpen = ref(false);
-const canNativeInstall = ref(false);
-const isPwaInstalled = ref(false);
-
-function detectInstalledPwa() {
-  return window.matchMedia('(display-mode: standalone)').matches
-    || window.matchMedia('(display-mode: fullscreen)').matches
-    || window.navigator.standalone === true;
-}
-
-function syncInstallPrompt() {
-  canNativeInstall.value = Boolean(window.__jiankeInstallPrompt);
-}
-
-function handleAppInstalled() {
-  canNativeInstall.value = false;
-  isPwaInstalled.value = true;
-  pwaHelpOpen.value = false;
-  notify('简课已成功添加到桌面');
-}
-
-function openPwaHelp() {
-  isPwaInstalled.value = detectInstalledPwa();
-  syncInstallPrompt();
-  pwaHelpOpen.value = true;
-}
-
-async function triggerInstallPwa() {
-  if (detectInstalledPwa()) {
-    isPwaInstalled.value = true;
-    notify('简课已经在独立应用模式中运行');
-    return;
-  }
-
-  const promptEvent = window.__jiankeInstallPrompt;
-  if (promptEvent) {
-    try {
-      await promptEvent.prompt();
-      const choice = await promptEvent.userChoice;
-      window.__jiankeInstallPrompt = null;
-      canNativeInstall.value = false;
-      if (choice && choice.outcome === 'accepted') {
-        notify('已确认安装，请等待浏览器添加到桌面');
-      } else {
-        notify('已取消添加');
-      }
-      return;
-    } catch (e) {
-      console.warn('Native install prompt failed:', e);
-    }
-  }
-  canNativeInstall.value = false;
-}
-
 
 // 计算属性
 const weekOptions = computed(() =>
@@ -431,10 +375,6 @@ function toggleNightMode() {
 onMounted(async () => {
   document.documentElement.setAttribute('data-bg', bgMode.value);
   window.addEventListener('auth:expired', logout);
-  window.addEventListener('pwa:install-ready', syncInstallPrompt);
-  window.addEventListener('pwa:installed', handleAppInstalled);
-  isPwaInstalled.value = detectInstalledPwa();
-  syncInstallPrompt();
   if (getToken()) {
     try {
       user.value = await authApi.me();
@@ -449,8 +389,6 @@ onMounted(async () => {
 
 onUnmounted(() => {
   window.removeEventListener('auth:expired', logout);
-  window.removeEventListener('pwa:install-ready', syncInstallPrompt);
-  window.removeEventListener('pwa:installed', handleAppInstalled);
   window.clearInterval(importTimer);
 });
 </script>
@@ -485,7 +423,6 @@ onUnmounted(() => {
       @logout="logout"
       @toggle-night-mode="toggleNightMode"
       @open-semester-settings="openSemesterSettings"
-      @open-pwa-help="openPwaHelp"
     />
 
     <ScheduleToolbar
@@ -565,17 +502,6 @@ onUnmounted(() => {
     @save="saveSemesterSettings"
     @delete="deleteSchedule"
   />
-
-  <!-- PWA 添加到桌面指引模态弹窗 -->
-  <PwaHelpModal
-    :open="pwaHelpOpen"
-    :can-native-install="canNativeInstall"
-    :installed="isPwaInstalled"
-    @close="pwaHelpOpen = false"
-    @install="triggerInstallPwa"
-  />
-
-
 
   <Transition name="toast">
     <div v-if="message" class="toast" role="status" aria-live="polite">{{ message }}</div>
