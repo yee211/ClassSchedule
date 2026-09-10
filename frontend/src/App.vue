@@ -32,6 +32,13 @@ import CourseEditorModal from './components/CourseEditorModal.vue';
 import ImporterModal from './components/ImporterModal.vue';
 import SemesterModal from './components/SemesterModal.vue';
 import AuthModal from './components/AuthModal.vue';
+import UpdateModal from './components/UpdateModal.vue';
+import {
+  CURRENT_VERSION_NAME,
+  checkAppUpdate,
+  ignoreUpdateVersion,
+  openDownloadUrl,
+} from './utils/version.js';
 
 // 基础状态
 const week = ref(1);
@@ -40,6 +47,10 @@ const schedules = ref([]);
 const schedule = ref(null);
 const loading = ref(true);
 const message = ref('');
+
+// 应用更新状态
+const updateModalOpen = ref(false);
+const updateInfo = ref({});
 
 // 用户认证状态
 const user = ref(null);
@@ -371,10 +382,41 @@ function toggleNightMode() {
   notify(bgMode.value === 'night' ? '已开启黑夜模式' : '已关闭黑夜模式');
 }
 
+// 应用更新控制
+async function handleCheckUpdate(silent = false) {
+  try {
+    const result = await checkAppUpdate(silent);
+    if (result.hasUpdate) {
+      updateInfo.value = result.updateInfo;
+      updateModalOpen.value = true;
+    } else if (!silent) {
+      notify(`当前已是最新版本 (v${CURRENT_VERSION_NAME})`);
+    }
+  } catch (error) {
+    if (!silent) {
+      notify(error.message || '检查更新失败，请稍后重试');
+    }
+  }
+}
+
+function onConfirmUpdate() {
+  if (updateInfo.value?.downloadUrl) {
+    openDownloadUrl(updateInfo.value.downloadUrl);
+  }
+}
+
+function onIgnoreUpdate() {
+  if (updateInfo.value?.versionCode) {
+    ignoreUpdateVersion(updateInfo.value.versionCode);
+  }
+  updateModalOpen.value = false;
+}
+
 // 生命周期
 onMounted(async () => {
   document.documentElement.setAttribute('data-bg', bgMode.value);
   window.addEventListener('auth:expired', logout);
+  handleCheckUpdate(true);
   if (getToken()) {
     try {
       user.value = await authApi.me();
@@ -417,12 +459,13 @@ onUnmounted(() => {
       :user="user"
       :schedule="schedule"
       :bg-mode="bgMode"
+      :app-version="CURRENT_VERSION_NAME"
       @delete-schedule="deleteSchedule"
       @add-course="openEditor()"
       @upload="upload"
       @logout="logout"
       @toggle-night-mode="toggleNightMode"
-      @open-semester-settings="openSemesterSettings"
+      @check-update="handleCheckUpdate(false)"
     />
 
     <ScheduleToolbar
@@ -501,6 +544,16 @@ onUnmounted(() => {
     @close="semesterModalOpen = false"
     @save="saveSemesterSettings"
     @delete="deleteSchedule"
+  />
+
+  <!-- 版本升级提示模态弹窗 -->
+  <UpdateModal
+    :open="updateModalOpen"
+    :update-info="updateInfo"
+    :current-version="CURRENT_VERSION_NAME"
+    @close="updateModalOpen = false"
+    @ignore="onIgnoreUpdate"
+    @confirm="onConfirmUpdate"
   />
 
   <Transition name="toast">

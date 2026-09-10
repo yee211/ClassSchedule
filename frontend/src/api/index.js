@@ -142,3 +142,10 @@ export const importerApi = {
     });
   },
 };
+
+export const appApi = {
+  async getVersion() {
+    return api('/api/app/version');
+  },
+};
+

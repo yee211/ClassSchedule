@@ -5,6 +5,7 @@ defineProps({
   user: { type: Object, default: null },
   schedule: { type: Object, default: null },
   bgMode: { type: String, default: 'transparent' },
+  appVersion: { type: String, default: '2.0.0' },
 });
 
 const emit = defineEmits([
@@ -13,7 +14,7 @@ const emit = defineEmits([
   'upload',
   'logout',
   'toggle-night-mode',
-  'open-semester-settings',
+  'check-update',
 ]);
 
 const userMenuRef = ref(null);
@@ -39,7 +40,7 @@ onUnmounted(() => {
 
 <template>
   <header class="top glass">
-    <div class="brand"><span class="brand-dot"></span><strong>简课</strong></div>
+    <div class="brand"><span class="brand-dot"></span><strong>序时</strong></div>
     <div class="top-actions">
       <button
         class="header-action uiverse-button"
@@ -65,7 +66,9 @@ onUnmounted(() => {
         </summary>
         <div class="user-menu-panel glass">
           <div class="user-menu-meta"><b>{{ user.username }}</b><small>{{ user.email }}</small></div>
-          <button type="button" :disabled="!schedule" @click="emit('open-semester-settings'); userMenuRef?.removeAttribute('open')">学期与日期设置</button>
+          <button type="button" @click="emit('check-update'); userMenuRef?.removeAttribute('open')">
+            检查更新 (v{{ appVersion }})
+          </button>
           <button type="button" :disabled="!schedule" @click="emit('delete-schedule'); userMenuRef?.removeAttribute('open')">删除当前课表</button>
           <button type="button" @click="emit('logout')">退出登录</button>
         </div>

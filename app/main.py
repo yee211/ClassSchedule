@@ -9,10 +9,12 @@ from fastapi.staticfiles import StaticFiles
 from .db import close_pool, connect, init_pool
 from .observability import configure_logging, request_metrics_middleware
 from .settings import settings
-from .routers import auth, courses, importer, schedules
+from .routers import app_update, auth, courses, importer, schedules
 
 ROOT = Path(__file__).resolve().parent.parent
 FRONTEND_DIST = ROOT / "frontend" / "dist"
+DOWNLOADS_DIR = ROOT / "static" / "downloads"
+DOWNLOADS_DIR.mkdir(parents=True, exist_ok=True)
 
 
 @asynccontextmanager
@@ -24,7 +26,7 @@ async def lifespan(_: FastAPI):
     close_pool()
 
 
-app = FastAPI(title="简课", version="2.0.0", lifespan=lifespan)
+app = FastAPI(title="序时", version="2.0.0", lifespan=lifespan)
 app.add_middleware(
     CORSMiddleware,
     allow_origins=list(settings.cors_origins),
@@ -34,11 +36,15 @@ app.add_middleware(
 )
 app.middleware("http")(request_metrics_middleware)
 
+# 挂载静态下载目录（供移动端 APK 直接下载更新）
+app.mount("/downloads", StaticFiles(directory=DOWNLOADS_DIR), name="downloads")
+
 # 注册业务子路由模块
 app.include_router(auth.router)
 app.include_router(schedules.router)
 app.include_router(courses.router)
 app.include_router(importer.router)
+app.include_router(app_update.router)
 
 
 @app.get("/api/health")

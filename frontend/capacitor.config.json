@@ -1,6 +1,6 @@
 {
   "appId": "io.github.yee211.classschedule",
-  "appName": "简课",
+  "appName": "序时",
   "webDir": "dist",
   "plugins": {
     "CapacitorHttp": {

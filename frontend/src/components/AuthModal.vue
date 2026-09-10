@@ -24,7 +24,7 @@ function switchMode(mode) {
     <section class="modal auth-card">
       <div class="auth-brand">
         <span class="brand-dot"></span>
-        <strong>简课</strong>
+        <strong>序时</strong>
       </div>
       <div class="auth-head">
         <h2>{{ authMode === 'register' ? '创建账号' : '欢迎回来' }}</h2>
