@@ -11,11 +11,11 @@ export const defaultSectionTimes = [
   ['19:00', '19:45'], ['19:55', '20:40'], ['20:50', '21:35'], ['21:45', '22:30'],
 ];
 
-// 大色相差课程调色板
+// 高辨识度课程调色板（参考主流课表高饱和清新配色）
 export const courseColors = [
-  '#2563EB', '#DC2626', '#059669', '#D97706', '#7C3AED', '#DB2777', '#0891B2', '#65A30D',
-  '#4F46E5', '#EA580C', '#0F766E', '#B91C1C', '#9333EA', '#0E7490', '#CA8A04', '#BE185D',
-  '#1D4ED8', '#15803D', '#C2410C', '#86198F', '#0369A1', '#A16207',
+  '#F59E0B', '#F43F5E', '#F97316', '#A855F7', '#06B6D4', '#84CC16',
+  '#3B82F6', '#EC4899', '#10B981', '#6366F1', '#EAB308', '#14B8A6',
+  '#8B5CF6', '#D946EF', '#2563EB', '#059669',
 ];
 
 export const emptyCourse = () => ({
@@ -109,6 +109,38 @@ export function weekDayDate(startDate, dayNumber, weekNumber) {
   if (!start) return '日期待设置';
   start.setDate(start.getDate() + (weekNumber - 1) * 7 + dayNumber - 1);
   return `${String(start.getMonth() + 1).padStart(2, '0')}.${String(start.getDate()).padStart(2, '0')}`;
+}
+
+export function weekMonth(startDate, weekNumber) {
+  const start = localDate(startDate);
+  if (!start) return '';
+  start.setDate(start.getDate() + (weekNumber - 1) * 7);
+  return `${String(start.getMonth() + 1).padStart(2, '0')}月`;
+}
+
+export function weekDayNumber(startDate, dayNumber, weekNumber) {
+  const start = localDate(startDate);
+  if (!start) return '';
+  start.setDate(start.getDate() + (weekNumber - 1) * 7 + dayNumber - 1);
+  return String(start.getDate()).padStart(2, '0');
+}
+
+export function shortDay(day) {
+  return String(day || '').replace('周', '');
+}
+
+export function isDayToday(startDate, dayNumber, weekNumber) {
+  const start = localDate(startDate);
+  if (!start) return false;
+  start.setDate(start.getDate() + (weekNumber - 1) * 7 + dayNumber - 1);
+  const now = new Date();
+  return start.getFullYear() === now.getFullYear()
+    && start.getMonth() === now.getMonth()
+    && start.getDate() === now.getDate();
+}
+
+export function cleanSectionTime(timeStr) {
+  return String(timeStr || '').replace(/^0/, '');
 }
 
 export function courseKey(name) {

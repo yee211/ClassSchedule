@@ -1,11 +1,15 @@
 <script setup>
 import { computed } from 'vue';
 import {
+  cleanSectionTime,
   courseKey,
   days,
   defaultSectionTimes,
+  isDayToday,
+  shortDay,
   timeRange,
-  weekDayDate,
+  weekDayNumber,
+  weekMonth,
 } from '../utils/schedule.js';
 
 const props = defineProps({
@@ -24,7 +28,7 @@ const maxSections = computed(() => {
 });
 
 const gridStyle = computed(() => ({
-  gridTemplateRows: `64px repeat(${maxSections.value}, 78px)`,
+  gridTemplateRows: `var(--grid-header-height, 46px) repeat(${maxSections.value}, var(--grid-section-height, 68px))`,
 }));
 
 const activeCourses = computed(() => {
@@ -52,31 +56,41 @@ const displayCourses = computed(() => {
 });
 
 function courseStyle(course) {
+  const span = course.end_section - course.start_section + 1;
   return {
     gridColumn: `${course.weekday + 1}`,
     gridRow: `${course.start_section + 1}/${course.end_section + 2}`,
     '--course': props.colorMap.get(courseKey(course.name)) || '#5B8DEF',
+    '--max-lines': span * 4,
   };
 }
 </script>
 
 <template>
-  <section class="schedule glass" :class="{ busy: loading }">
+  <section class="schedule" :class="{ busy: loading }">
     <div v-if="loading" class="state">正在读取课表…</div>
     <div v-else-if="!schedule" class="state">还没有课表</div>
     <div v-else class="grid" :style="gridStyle">
-      <div class="corner">节次</div>
-      <div v-for="(day, index) in days" :key="day" class="day">
-        <b>{{ day }}</b>
-        <span>{{ weekDayDate(schedule.start_date, index + 1, week) }}</span>
+      <div class="corner">
+        <span class="corner-month">{{ weekMonth(schedule.start_date, week) }}</span>
+        <span class="corner-label">节次</span>
+      </div>
+      <div
+        v-for="(day, index) in days"
+        :key="day"
+        class="day"
+        :class="{ 'is-today': isDayToday(schedule.start_date, index + 1, week) }"
+      >
+        <span class="day-date">{{ weekDayNumber(schedule.start_date, index + 1, week) }}</span>
+        <b class="day-name">{{ shortDay(day) }}</b>
       </div>
       <template v-for="section in maxSections" :key="section">
         <div class="section" :style="{ gridColumn: 1, gridRow: section + 1 }">
-          <b>{{ section }}</b>
-          <span>
-            {{ defaultSectionTimes[section - 1]?.[0] || '' }}<br>
-            {{ defaultSectionTimes[section - 1]?.[1] || '' }}
-          </span>
+          <b class="section-num">{{ section }}</b>
+          <div class="section-times">
+            <span>{{ cleanSectionTime(defaultSectionTimes[section - 1]?.[0]) }}</span>
+            <span>{{ cleanSectionTime(defaultSectionTimes[section - 1]?.[1]) }}</span>
+          </div>
         </div>
         <div
           v-for="day in 7"
@@ -92,9 +106,11 @@ function courseStyle(course) {
         :style="courseStyle(course)"
         @click="emit('preview-course', course)"
       >
-        <b>{{ course.name }}</b>
-        <span>{{ course.room }} · {{ course.teacher }}</span>
-        <small>{{ timeRange(course) }}</small>
+        <span class="course-text">
+          <span class="course-name">{{ course.name }}</span>
+          <span class="course-room" v-if="course.room">({{ course.room }})</span>
+          <span class="course-teacher" v-if="course.teacher">{{ course.teacher }}</span>
+        </span>
       </button>
     </div>
   </section>

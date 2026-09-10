@@ -300,8 +300,65 @@ function toggleNightMode() {
   notify(bgMode.value === 'night' ? '已开启黑夜模式' : '已关闭黑夜模式');
 }
 
+// 壁纸与移动端适配
+const customWallpaper = ref(localStorage.getItem('schedule_custom_wallpaper') || '');
+const isMobile = ref(false);
+
+function compressImage(src, callback) {
+  const img = new Image();
+  img.onload = () => {
+    const canvas = document.createElement('canvas');
+    const maxDim = 1920;
+    let width = img.width;
+    let height = img.height;
+    if (width > maxDim || height > maxDim) {
+      if (width > height) {
+        height = Math.round((height * maxDim) / width);
+        width = maxDim;
+      } else {
+        width = Math.round((width * maxDim) / height);
+        height = maxDim;
+      }
+    }
+    canvas.width = width;
+    canvas.height = height;
+    const ctx = canvas.getContext('2d');
+    ctx.drawImage(img, 0, 0, width, height);
+    callback(canvas.toDataURL('image/jpeg', 0.85));
+  };
+  img.src = src;
+}
+
+function handleWallpaperChange(event) {
+  const file = event.target.files?.[0];
+  if (!file) return;
+  if (!file.type.startsWith('image/')) {
+    notify('请选择图片文件');
+    return;
+  }
+  const reader = new FileReader();
+  reader.onload = (e) => {
+    compressImage(e.target.result, (compressed) => {
+      customWallpaper.value = compressed;
+      try {
+        localStorage.setItem('schedule_custom_wallpaper', compressed);
+      } catch {
+        console.warn('localStorage storage limit reached');
+      }
+      notify('背景壁纸已更新！');
+    });
+  };
+  reader.readAsDataURL(file);
+}
+
+function checkMobile() {
+  isMobile.value = window.innerWidth <= 768 || /Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
+}
+
 // 生命周期
 onMounted(async () => {
+  checkMobile();
+  window.addEventListener('resize', checkMobile);
   document.documentElement.setAttribute('data-bg', bgMode.value);
   window.addEventListener('auth:expired', logout);
   if (getToken()) {
@@ -317,12 +374,20 @@ onMounted(async () => {
 });
 
 onUnmounted(() => {
+  window.removeEventListener('resize', checkMobile);
   window.removeEventListener('auth:expired', logout);
 });
 </script>
 
 <template>
+  <div
+    v-if="customWallpaper"
+    class="custom-wallpaper-bg"
+    :style="{ backgroundImage: `url(${customWallpaper})` }"
+    aria-hidden="true"
+  ></div>
   <iframe
+    v-else-if="!isMobile"
     class="wallpaper-background"
     src="/wallpaper/index.html"
     title="动态壁纸背景"
@@ -346,6 +411,7 @@ onUnmounted(() => {
       @upload="upload"
       @logout="logout"
       @toggle-night-mode="toggleNightMode"
+      @change-wallpaper="handleWallpaperChange"
     />
 
     <ScheduleToolbar
@@ -941,26 +1007,27 @@ html[data-bg="night"] .user-badge {
     align-items: center;
     justify-content: space-between;
     width: 100%;
-    gap: 8px;
+    gap: 4px;
   }
   .term-picker p {
     margin: 0;
-    font-size: 0.76rem;
+    font-size: 0.72rem;
     color: #94a3b8;
     white-space: nowrap;
   }
   .term-select-wrap {
-    padding: 2px 8px;
-    max-width: calc(100vw - 110px);
+    padding: 2px 6px;
+    max-width: calc(100vw - 90px);
+    border-radius: 8px;
   }
   .term-select-wrap select {
-    max-width: calc(100vw - 136px);
-    font-size: 0.95rem;
-    padding: 2px 20px 2px 0;
+    max-width: calc(100vw - 110px);
+    font-size: 0.86rem;
+    padding: 2px 16px 2px 2px;
   }
   .week-picker {
     width: 100%;
-    gap: 5px;
+    gap: 3px;
     justify-content: space-between;
   }
   .week-menu {
@@ -968,49 +1035,51 @@ html[data-bg="night"] .user-badge {
     min-width: 0;
   }
   .week-trigger {
-    height: 38px;
-    padding: 4px 8px;
-    border-radius: 12px;
+    height: 30px;
+    padding: 2px 6px;
+    border-radius: 8px;
   }
   .week-trigger b {
-    font-size: 0.82rem;
+    font-size: 0.78rem;
   }
   .week-trigger small {
-    font-size: 0.62rem;
+    font-size: 0.58rem;
   }
   .week-menu-panel {
     right: auto;
     left: 0;
-    width: min(340px, calc(100vw - 24px));
-    padding: 12px;
+    width: min(340px, calc(100vw - 16px));
+    padding: 10px;
+    border-radius: 14px;
   }
   .week-menu-grid {
     grid-template-columns: repeat(3, minmax(0, 1fr));
-    gap: 6px;
+    gap: 5px;
   }
   .week-option {
-    min-height: 52px;
-    padding: 6px 4px;
-    border-radius: 10px;
+    min-height: 44px;
+    padding: 3px 2px;
+    border-radius: 8px;
   }
   .week-option b {
-    font-size: 0.78rem;
+    font-size: 0.74rem;
   }
   .week-option small {
-    font-size: 0.58rem;
+    font-size: 0.54rem;
   }
   .reset-week {
-    height: 38px;
-    min-width: 56px !important;
+    height: 30px;
+    min-width: 44px !important;
     padding: 0 6px !important;
-    font-size: 0.78rem;
-    border-radius: 12px;
+    font-size: 0.72rem;
+    border-radius: 8px;
   }
   .week-nav {
-    height: 38px;
-    width: 34px;
-    flex: 0 0 34px;
-    border-radius: 12px;
+    height: 30px;
+    width: 28px;
+    flex: 0 0 28px;
+    border-radius: 8px;
+    font-size: 0.9rem;
   }
 }
 </style>
