@@ -93,6 +93,13 @@ export const schedulesApi = {
   async list() {
     return api('/api/schedules');
   },
+  async update(id, data) {
+    return api(`/api/schedules/${id}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(data),
+    });
+  },
   async delete(id) {
     return api(`/api/schedules/${id}`, { method: 'DELETE' });
   },

@@ -86,12 +86,86 @@ export function scheduleWeekCount(schedule) {
   return Math.min(30, Math.max(20, ...courseWeeks, 20));
 }
 
-export function termWeek(startDate, totalWeeks = 20) {
+export function isScheduleActiveToday(schedule) {
+  const start = localDate(schedule?.start_date);
+  if (!start) return false;
+  const totalWeeks = scheduleWeekCount(schedule);
+  const end = localDate(schedule?.end_date) || new Date(start.getTime() + (totalWeeks * 7 - 1) * 86400000);
+  const now = new Date();
+  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
+  const startTime = new Date(start.getFullYear(), start.getMonth(), start.getDate()).getTime();
+  const endTime = new Date(end.getFullYear(), end.getMonth(), end.getDate(), 23, 59, 59).getTime();
+  return today >= startTime && today <= endTime;
+}
+
+export function findCurrentSchedule(schedules) {
+  if (!schedules?.length) return null;
+  // 1. 优先定位包含当前日期的进行中学期
+  const active = schedules.find(s => isScheduleActiveToday(s));
+  if (active) return active;
+
+  // 2. 若处于假期/无严格匹配，选择开学日期最新的课表
+  const withDates = schedules.filter(s => s.start_date);
+  if (withDates.length) {
+    return [...withDates].sort((a, b) => (b.start_date > a.start_date ? 1 : -1) || (b.id - a.id))[0];
+  }
+
+  // 3. 兜底返回最新课表
+  return [...schedules].sort((a, b) => b.id - a.id)[0];
+}
+
+export function suggestSemesterDates(termStr) {
+  const text = String(termStr || '').trim();
+  const match = text.match(/(\d{4})\s*[-–—/]\s*(\d{4})?[^\d]*([12一二秋春])/);
+  if (match) {
+    const year1 = Number(match[1]);
+    const termType = match[3];
+    const isFirstTerm = termType === '1' || termType === '一' || termType === '秋';
+
+    if (isFirstTerm) {
+      const sept1 = new Date(year1, 8, 1);
+      const day = sept1.getDay();
+      const mondayOffset = day === 0 ? 1 : (day === 1 ? 0 : 8 - day);
+      const start = new Date(year1, 8, 1 + mondayOffset);
+      const end = new Date(start.getTime() + (20 * 7 - 1) * 86400000);
+      return { start: isoDate(start), end: isoDate(end) };
+    } else {
+      const year2 = match[2] ? Number(match[2]) : year1 + 1;
+      const mar1 = new Date(year2, 2, 1);
+      const day = mar1.getDay();
+      const mondayOffset = day === 0 ? 1 : (day === 1 ? 0 : 8 - day);
+      const start = new Date(year2, 2, 1 + mondayOffset);
+      const end = new Date(start.getTime() + (20 * 7 - 1) * 86400000);
+      return { start: isoDate(start), end: isoDate(end) };
+    }
+  }
+
+  const yearMatch = text.match(/(\d{4})/);
+  if (yearMatch) {
+    const y = Number(yearMatch[1]);
+    const start = new Date(y, 8, 1);
+    const end = new Date(start.getTime() + (20 * 7 - 1) * 86400000);
+    return { start: isoDate(start), end: isoDate(end) };
+  }
+
+  return null;
+}
+
+export function termWeek(startDate, totalWeeks = 20, schedule = null) {
   if (!startDate) return 1;
-  const start = new Date(`${startDate}T00:00:00`);
-  const today = new Date();
-  const elapsed = Math.floor((today - start) / 86400000);
-  return Math.max(1, Math.min(totalWeeks, Math.floor(elapsed / 7) + 1));
+  const start = localDate(startDate);
+  if (!start) return 1;
+
+  if (schedule && !isScheduleActiveToday(schedule)) {
+    // 历史或未来学期：打开时默认从第 1 周开始看起
+    return 1;
+  }
+
+  const now = new Date();
+  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  const elapsedDays = Math.floor((today - start) / 86400000);
+  const calculated = Math.floor(elapsedDays / 7) + 1;
+  return Math.max(1, Math.min(totalWeeks, calculated));
 }
 
 export function weekRange(startDate, weekNumber) {
@@ -129,7 +203,10 @@ export function shortDay(day) {
   return String(day || '').replace('周', '');
 }
 
-export function isDayToday(startDate, dayNumber, weekNumber) {
+export function isDayToday(startDate, dayNumber, weekNumber, schedule = null) {
+  if (schedule && !isScheduleActiveToday(schedule)) {
+    return false;
+  }
   const start = localDate(startDate);
   if (!start) return false;
   start.setDate(start.getDate() + (weekNumber - 1) * 7 + dayNumber - 1);
@@ -138,6 +215,7 @@ export function isDayToday(startDate, dayNumber, weekNumber) {
     && start.getMonth() === now.getMonth()
     && start.getDate() === now.getDate();
 }
+
 
 export function cleanSectionTime(timeStr) {
   return String(timeStr || '').replace(/^0/, '');

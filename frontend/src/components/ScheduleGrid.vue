@@ -79,7 +79,7 @@ function courseStyle(course) {
         v-for="(day, index) in days"
         :key="day"
         class="day"
-        :class="{ 'is-today': isDayToday(schedule.start_date, index + 1, week) }"
+        :class="{ 'is-today': isDayToday(schedule.start_date, index + 1, week, schedule) }"
       >
         <span class="day-date">{{ weekDayNumber(schedule.start_date, index + 1, week) }}</span>
         <b class="day-name">{{ shortDay(day) }}</b>

@@ -15,9 +15,12 @@ import {
   buildCourseColorMap,
   defaultEndDate,
   emptyCourse,
+  findCurrentSchedule,
   formatWeeks,
+  isScheduleActiveToday,
   parseWeeks,
   scheduleWeekCount,
+  suggestSemesterDates,
   termWeek,
 } from './utils/schedule.js';
 
@@ -27,6 +30,7 @@ import ScheduleGrid from './components/ScheduleGrid.vue';
 import CoursePreviewModal from './components/CoursePreviewModal.vue';
 import CourseEditorModal from './components/CourseEditorModal.vue';
 import ImporterModal from './components/ImporterModal.vue';
+import SemesterModal from './components/SemesterModal.vue';
 import AuthModal from './components/AuthModal.vue';
 
 // 基础状态
@@ -61,6 +65,9 @@ const importStartDate = ref('');
 const importEndDate = ref('');
 const importElapsed = ref(0);
 let importTimer = null;
+
+const semesterModalOpen = ref(false);
+const semesterSaving = ref(false);
 
 // 计算属性
 const weekOptions = computed(() =>
@@ -127,21 +134,42 @@ async function submitAuth() {
 }
 
 // 加载课表列表
-async function load(preferredId = schedule.value?.id) {
+async function load(preferredId = null) {
   try {
     const list = await schedulesApi.list();
     schedules.value = list;
-    const savedId = getActiveScheduleId();
-    schedule.value = list.find(item => item.id === Number(preferredId))
-      || list.find(item => item.id === savedId)
-      || list[0]
-      || null;
+
+    if (!list.length) {
+      schedule.value = null;
+      return;
+    }
+
+    let selected = null;
+    if (preferredId) {
+      selected = list.find(item => item.id === Number(preferredId));
+    }
+
+    if (!selected) {
+      const activeSchedule = findCurrentSchedule(list);
+      const savedId = getActiveScheduleId();
+      const savedSchedule = list.find(item => item.id === savedId);
+
+      // 仅当上次记录的课表在当前仍然有效时才保持；
+      // 若上次看的是历史学期，关闭后重新打开必须定位到当前学期！
+      if (savedSchedule && isScheduleActiveToday(savedSchedule)) {
+        selected = savedSchedule;
+      } else {
+        selected = activeSchedule || list[0];
+      }
+    }
+
+    schedule.value = selected || list[0] || null;
 
     if (schedule.value) {
       setActiveScheduleId(schedule.value.id);
     }
     const totalWeeks = scheduleWeekCount(schedule.value);
-    currentWeek.value = termWeek(schedule.value?.start_date, totalWeeks);
+    currentWeek.value = termWeek(schedule.value?.start_date, totalWeeks, schedule.value);
     week.value = currentWeek.value;
   } catch (error) {
     notify(error.message);
@@ -157,7 +185,7 @@ function selectSchedule(event) {
     setActiveScheduleId(schedule.value.id);
   }
   const totalWeeks = scheduleWeekCount(schedule.value);
-  currentWeek.value = termWeek(schedule.value?.start_date, totalWeeks);
+  currentWeek.value = termWeek(schedule.value?.start_date, totalWeeks, schedule.value);
   week.value = currentWeek.value;
 }
 
@@ -170,12 +198,34 @@ async function deleteSchedule() {
   try {
     await schedulesApi.delete(current.id);
     setActiveScheduleId(null);
+    semesterModalOpen.value = false;
     await load(null);
     notify('课表已删除');
   } catch (error) {
     notify(error.message);
   }
 }
+
+// 学期设置
+function openSemesterSettings() {
+  semesterModalOpen.value = true;
+}
+
+async function saveSemesterSettings(payload) {
+  if (!schedule.value) return;
+  semesterSaving.value = true;
+  try {
+    const updated = await schedulesApi.update(schedule.value.id, payload);
+    semesterModalOpen.value = false;
+    notify('学期设置已保存');
+    await load(updated.id);
+  } catch (error) {
+    notify(error.message);
+  } finally {
+    semesterSaving.value = false;
+  }
+}
+
 
 function goCurrentWeek() {
   week.value = currentWeek.value;
@@ -253,9 +303,23 @@ function upload(event) {
   importFile.value = file;
   importError.value = '';
   importEngine.value = '';
-  importStartDate.value = schedule.value?.start_date?.slice(0, 10) || '';
-  importEndDate.value = schedule.value?.end_date?.slice(0, 10) || defaultEndDate(importStartDate.value);
+
+  // 智能推测学期日期：优先看文件名是否含有学年学期标识（如 2025-2026-1 等）
+  const suggestedFromName = suggestSemesterDates(file.name);
+  if (suggestedFromName) {
+    importStartDate.value = suggestedFromName.start;
+    importEndDate.value = suggestedFromName.end;
+  } else if (schedule.value && isScheduleActiveToday(schedule.value)) {
+    importStartDate.value = schedule.value.start_date?.slice(0, 10) || '';
+    importEndDate.value = schedule.value.end_date?.slice(0, 10) || defaultEndDate(importStartDate.value);
+  } else {
+    const currentYear = new Date().getFullYear();
+    const currentSuggested = suggestSemesterDates(`${currentYear}-${currentYear + 1}-1`);
+    importStartDate.value = currentSuggested?.start || '';
+    importEndDate.value = currentSuggested?.end || defaultEndDate(importStartDate.value);
+  }
 }
+
 
 async function startImport() {
   if (!importFile.value) return;
@@ -358,6 +422,7 @@ onUnmounted(() => {
       @upload="upload"
       @logout="logout"
       @toggle-night-mode="toggleNightMode"
+      @open-semester-settings="openSemesterSettings"
     />
 
     <ScheduleToolbar
@@ -369,6 +434,7 @@ onUnmounted(() => {
       @update:week="week = $event"
       @select-schedule="selectSchedule"
       @go-current-week="goCurrentWeek"
+      @open-semester-settings="openSemesterSettings"
     />
 
     <ScheduleGrid
@@ -426,6 +492,17 @@ onUnmounted(() => {
     @update:import-end-date="importEndDate = $event"
     @start-import="startImport"
   />
+
+  <!-- 学期与开学日期设置模态弹窗 -->
+  <SemesterModal
+    :open="semesterModalOpen"
+    :schedule="schedule"
+    :saving="semesterSaving"
+    @close="semesterModalOpen = false"
+    @save="saveSemesterSettings"
+    @delete="deleteSchedule"
+  />
+
 
   <Transition name="toast">
     <div v-if="message" class="toast" role="status" aria-live="polite">{{ message }}</div>
