@@ -84,6 +84,17 @@ function switchMode(mode) {
           <span class="auth-version-sep">·</span>
           <button type="button" class="auth-check-btn" @click="emit('check-update')">检查更新</button>
         </template>
+        <template v-else>
+          <span class="auth-version-sep">·</span>
+          <a
+            href="/downloads/%E5%BA%8F%E6%97%B6.apk"
+            download="序时.apk"
+            class="auth-check-btn"
+            title="下载 Android 安装包"
+          >
+            📱 下载安卓 App
+          </a>
+        </template>
       </div>
     </section>
   </div>

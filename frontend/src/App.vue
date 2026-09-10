@@ -453,9 +453,9 @@ onUnmounted(() => {
 </script>
 
 <template>
-  <!-- 开屏封面（仅在 Android 原生 App 启动时展示，轻触或2秒后平滑进入） -->
+  <!-- 开屏封面（仅在 Android 原生 App 启动时展示，轻触或1秒后平滑进入） -->
   <Transition name="splash-fade">
-    <SplashScreen v-if="isNative && showSplash" :duration="2.2" @finish="showSplash = false" />
+    <SplashScreen v-if="isNative && showSplash" :duration="1.0" @finish="showSplash = false" />
   </Transition>
 
   <video
@@ -1155,5 +1155,13 @@ html[data-bg="night"] .user-badge {
     border-radius: 20px;
     font-size: 0.95rem;
   }
+}
+
+.splash-fade-leave-active {
+  transition: opacity 0.4s cubic-bezier(0.25, 1, 0.5, 1), transform 0.4s cubic-bezier(0.25, 1, 0.5, 1);
+}
+.splash-fade-leave-to {
+  opacity: 0;
+  transform: scale(1.02);
 }
 </style>

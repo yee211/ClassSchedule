@@ -70,6 +70,17 @@ onUnmounted(() => {
         <span class="action-text">检查更新</span>
         <span class="action-text-short">更新</span>
       </button>
+      <a
+        v-else
+        class="header-action uiverse-button download-apk-btn"
+        href="/downloads/%E5%BA%8F%E6%97%B6.apk"
+        download="序时.apk"
+        title="下载安装 Android App (APK)"
+      >
+        <span aria-hidden="true">📱</span>
+        <span class="action-text">下载 App</span>
+        <span class="action-text-short">App</span>
+      </a>
       <details v-if="user" ref="userMenuRef" class="user-menu">
         <summary class="user-badge uiverse-button" :title="user.email">
           <span class="user-avatar" aria-hidden="true">{{ user.username?.slice(0, 1)?.toUpperCase() }}</span>
@@ -78,9 +89,18 @@ onUnmounted(() => {
         </summary>
         <div class="user-menu-panel glass">
           <div class="user-menu-meta"><b>{{ user.username }}</b><small>{{ user.email }}</small></div>
-          <button type="button" @click="emit('check-update'); userMenuRef?.removeAttribute('open')">
+          <button v-if="isNative" type="button" @click="emit('check-update'); userMenuRef?.removeAttribute('open')">
             检查更新 (v{{ appVersion }})
           </button>
+          <a
+            v-else
+            href="/downloads/%E5%BA%8F%E6%97%B6.apk"
+            download="序时.apk"
+            class="user-menu-link"
+            @click="userMenuRef?.removeAttribute('open')"
+          >
+            📱 下载安卓 App (APK)
+          </a>
           <button type="button" :disabled="!schedule" @click="emit('delete-schedule'); userMenuRef?.removeAttribute('open')">删除当前课表</button>
           <button type="button" @click="emit('logout')">退出登录</button>
         </div>

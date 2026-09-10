@@ -489,7 +489,10 @@ html[data-bg="frosted"] .ambient-canvas {
   color: #64748b;
   text-overflow: ellipsis;
 }
-.user-menu-panel button {
+.user-menu-panel button,
+.user-menu-panel a,
+.user-menu-link {
+  display: block;
   width: 100%;
   padding: 10px;
   border: 0;
@@ -498,14 +501,23 @@ html[data-bg="frosted"] .ambient-canvas {
   background: transparent;
   text-align: left;
   cursor: pointer;
+  text-decoration: none;
+  font-size: 0.88rem;
+  box-sizing: border-box;
 }
-.user-menu-panel button:hover { background: rgba(255, 255, 255, 0.35); }
+.user-menu-panel button:hover,
+.user-menu-panel a:hover,
+.user-menu-link:hover { background: rgba(255, 255, 255, 0.35); }
 .user-menu-panel button:disabled { opacity: 0.45; cursor: not-allowed; }
 
 html[data-bg="night"] .user-menu-meta b { color: #f8fafc; }
 html[data-bg="night"] .user-menu-meta small { color: #94a3b8; }
-html[data-bg="night"] .user-menu-panel button { color: #f1f5f9; }
-html[data-bg="night"] .user-menu-panel button:hover { background: rgba(255, 255, 255, 0.12); }
+html[data-bg="night"] .user-menu-panel button,
+html[data-bg="night"] .user-menu-panel a,
+html[data-bg="night"] .user-menu-link { color: #f1f5f9; }
+html[data-bg="night"] .user-menu-panel button:hover,
+html[data-bg="night"] .user-menu-panel a:hover,
+html[data-bg="night"] .user-menu-link:hover { background: rgba(255, 255, 255, 0.12); }
 
 .header-action {
   display: flex;
@@ -519,6 +531,7 @@ html[data-bg="night"] .user-menu-panel button:hover { background: rgba(255, 255,
   font-weight: 600;
   line-height: normal;
   white-space: nowrap;
+  text-decoration: none;
 }
 
 .delete-schedule:disabled {

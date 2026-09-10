@@ -197,8 +197,8 @@ uvicorn app.main:app --host 0.0.0.0 --port 8000
 
 ```env
 # 数据库
-DATABASE_URL=postgresql://class_schedule:class_schedule@127.0.0.1:5433/class_schedule
-POSTGRES_ADMIN_URL=postgresql://class_schedule:class_schedule@127.0.0.1:5433/postgres
+DATABASE_URL=postgresql://class_schedule:class_schedule@127.0.0.1:5432/class_schedule
+POSTGRES_ADMIN_URL=postgresql://class_schedule:class_schedule@127.0.0.1:5432/postgres
 
 # 鉴权
 JWT_SECRET=please-change-this-to-a-long-random-string

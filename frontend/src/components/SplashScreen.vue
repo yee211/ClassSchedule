@@ -2,7 +2,7 @@
 import { onMounted, onUnmounted, ref } from 'vue';
 
 const props = defineProps({
-  duration: { type: Number, default: 2.2 },
+  duration: { type: Number, default: 1.0 },
 });
 
 const emit = defineEmits(['finish']);
@@ -63,7 +63,7 @@ onUnmounted(() => {
   height: 100%;
   object-fit: cover;
   object-position: center;
-  animation: kenburns 4.5s cubic-bezier(0.25, 1, 0.5, 1) forwards;
+  animation: kenburns 1.2s cubic-bezier(0.25, 1, 0.5, 1) forwards;
 }
 
 @keyframes kenburns {
