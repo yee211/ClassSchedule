@@ -1,4 +1,4 @@
-const CACHE_NAME = 'jianke-cache-v1';
+const CACHE_NAME = 'jianke-cache-v2';
 
 const STATIC_PRECACHE = [
   '/',
@@ -10,7 +10,9 @@ const STATIC_PRECACHE = [
   '/pwa-maskable-192x192.png',
   '/pwa-maskable-512x512.png',
   '/apple-touch-icon.png',
+  '/apple-touch-icon-precomposed.png',
   '/favicon.png',
+  '/favicon.ico',
   '/wallpaper-fallback.jpg'
 ];
 
