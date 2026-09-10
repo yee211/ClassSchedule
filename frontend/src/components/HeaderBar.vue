@@ -58,6 +58,16 @@ onUnmounted(() => {
         <span class="action-text">上传课表</span>
         <span class="action-text-short">导入</span>
       </label>
+      <button
+        class="header-action uiverse-button"
+        type="button"
+        title="检查更新"
+        @click="emit('check-update')"
+      >
+        <span aria-hidden="true">🔄</span>
+        <span class="action-text">检查更新</span>
+        <span class="action-text-short">更新</span>
+      </button>
       <details v-if="user" ref="userMenuRef" class="user-menu">
         <summary class="user-badge uiverse-button" :title="user.email">
           <span class="user-avatar" aria-hidden="true">{{ user.username?.slice(0, 1)?.toUpperCase() }}</span>

@@ -28,6 +28,7 @@ class AppVersionResponse(BaseModel):
     title: str = "发现新版本"
     changelog: list[str] = []
     downloadUrl: str
+    backupDownloadUrl: str | None = None
     forceUpdate: bool = False
 
 

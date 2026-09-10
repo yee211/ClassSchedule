@@ -8,6 +8,7 @@
     "全面提升启动视觉与过渡平滑度",
     "持续优化应用内更新提醒机制"
   ],
-  "downloadUrl": "https://api.tanzeng.xyz/downloads/ClassSchedule.apk",
+  "downloadUrl": "https://gh-proxy.com/https://raw.githubusercontent.com/yee211/ClassSchedule/main/static/downloads/ClassSchedule.apk",
+  "backupDownloadUrl": "https://api.tanzeng.xyz/downloads/ClassSchedule.apk",
   "forceUpdate": false
 }

@@ -59,9 +59,12 @@ const emit = defineEmits(['close', 'ignore', 'confirm']);
 
         <div class="update-tip">
           <span class="tip-icon">💡</span>
-          <span class="tip-text">
-            点击后将调起手机浏览器高速下载，完成后点击安装即可覆盖升级（现有课表数据完整保留）。
-          </span>
+          <div class="tip-content">
+            <p class="tip-text">点击后将调起手机浏览器高速下载，完成后点击安装即可覆盖升级（现有课表数据完整保留）。</p>
+            <p v-if="updateInfo.backupDownloadUrl" class="backup-tip">
+              如遇网络波动，可尝试：<button type="button" class="link-btn" @click="emit('confirm', updateInfo.backupDownloadUrl)">切换服务器直连通道</button>
+            </p>
+          </div>
         </div>
 
         <div v-if="updateInfo.forceUpdate" class="force-update-notice">
@@ -82,9 +85,9 @@ const emit = defineEmits(['close', 'ignore', 'confirm']);
         <button
           type="button"
           class="primary"
-          @click="emit('confirm')"
+          @click="emit('confirm', updateInfo.downloadUrl)"
         >
-          立即更新 (高速下载)
+          🚀 立即更新 (CDN 极速下载)
         </button>
       </div>
     </section>
@@ -218,6 +221,32 @@ const emit = defineEmits(['close', 'ignore', 'confirm']);
   font-size: 0.78rem;
   color: #0369a1;
   line-height: 1.4;
+}
+
+.tip-content {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.tip-content p {
+  margin: 0;
+}
+
+.backup-tip {
+  color: #64748b;
+  font-size: 0.75rem;
+}
+
+.link-btn {
+  background: none;
+  border: none;
+  padding: 0;
+  color: #0284c7;
+  font-size: 0.75rem;
+  font-weight: 600;
+  text-decoration: underline;
+  cursor: pointer;
 }
 
 .tip-icon {

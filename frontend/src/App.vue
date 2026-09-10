@@ -403,9 +403,10 @@ async function handleCheckUpdate(silent = false) {
   }
 }
 
-function onConfirmUpdate() {
-  if (updateInfo.value?.downloadUrl) {
-    openDownloadUrl(updateInfo.value.downloadUrl);
+function onConfirmUpdate(url) {
+  const target = typeof url === 'string' && url ? url : updateInfo.value?.downloadUrl;
+  if (target) {
+    openDownloadUrl(target);
   }
 }
 
@@ -505,9 +506,11 @@ onUnmounted(() => {
     :auth-form="authForm"
     :auth-error="authError"
     :auth-loading="authLoading"
+    :app-version="CURRENT_VERSION_NAME"
     @submit="submitAuth"
     @update:auth-mode="authMode = $event"
     @clear-error="authError = ''"
+    @check-update="handleCheckUpdate(false)"
   />
 
   <!-- 课程预览模态弹窗 -->

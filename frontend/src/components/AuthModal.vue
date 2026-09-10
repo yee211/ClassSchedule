@@ -5,12 +5,14 @@ defineProps({
   authForm: { type: Object, required: true },
   authError: { type: String, default: '' },
   authLoading: { type: Boolean, default: false },
+  appVersion: { type: String, default: '2.1.1' },
 });
 
 const emit = defineEmits([
   'submit',
   'update:authMode',
   'clear-error',
+  'check-update',
 ]);
 
 function switchMode(mode) {
@@ -75,6 +77,41 @@ function switchMode(mode) {
           还没有账号？<button type="button" @click="switchMode('register')">立即注册</button>
         </template>
       </p>
+      <div class="auth-version-bar">
+        <span>序时 v{{ appVersion }}</span>
+        <span class="auth-version-sep">·</span>
+        <button type="button" class="auth-check-btn" @click="emit('check-update')">检查更新</button>
+      </div>
     </section>
   </div>
 </template>
+
+<style scoped>
+.auth-version-bar {
+  margin-top: 16px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  font-size: 0.78rem;
+  color: #94a3b8;
+}
+.auth-version-sep {
+  opacity: 0.5;
+}
+.auth-check-btn {
+  background: none;
+  border: none;
+  color: #0284c7;
+  font-size: 0.78rem;
+  font-weight: 500;
+  cursor: pointer;
+  padding: 2px 6px;
+  border-radius: 4px;
+  transition: opacity 0.2s;
+}
+.auth-check-btn:hover {
+  opacity: 0.8;
+  text-decoration: underline;
+}
+</style>
