@@ -45,8 +45,8 @@ import {
 // 检测运行环境：Android 原生 App vs 网页浏览器
 const isNative = ref(isNativePlatform());
 
-// 开屏状态（3秒停留 + 跳过）
-const showSplash = ref(true);
+// 开屏状态（仅 Android 原生 App 启动时展示，网页端直接进入）
+const showSplash = ref(isNative.value);
 
 // 基础状态
 const week = ref(1);
@@ -453,9 +453,9 @@ onUnmounted(() => {
 </script>
 
 <template>
-  <!-- 开屏二次元壁纸（3秒停留 + 跳过） -->
+  <!-- 开屏封面（仅在 Android 原生 App 启动时展示，轻触或2秒后平滑进入） -->
   <Transition name="splash-fade">
-    <SplashScreen v-if="showSplash" :duration="3" @finish="showSplash = false" />
+    <SplashScreen v-if="isNative && showSplash" :duration="2.2" @finish="showSplash = false" />
   </Transition>
 
   <video
