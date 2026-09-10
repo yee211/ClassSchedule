@@ -1,13 +1,14 @@
 {
-  "versionCode": 7,
-  "versionName": "2.1.5",
+  "versionCode": 8,
+  "versionName": "2.1.6",
   "minVersionCode": 1,
-  "title": "发现新版本 v2.1.5",
+  "title": "发现新版本 v2.1.6",
   "changelog": [
-    "更新「序时」专属正序应用图标",
-    "同步更新 Android 原生与 Web/PWA 全套图标资产"
+    "开屏图片动画缩短至1秒，秒开课表",
+    "网页端增加安卓APK下载与安装按钮",
+    "数据库端口统一调整为标准5432"
   ],
-  "downloadUrl": "https://gh-proxy.com/https://raw.githubusercontent.com/yee211/ClassSchedule/main/static/downloads/%E5%BA%8F%E6%97%B6_v2.1.5.apk",
-  "backupDownloadUrl": "https://api.tanzeng.xyz/downloads/%E5%BA%8F%E6%97%B6_v2.1.5.apk",
+  "downloadUrl": "https://gh-proxy.com/https://raw.githubusercontent.com/yee211/ClassSchedule/main/static/downloads/%E5%BA%8F%E6%97%B6_v2.1.6.apk",
+  "backupDownloadUrl": "https://api.tanzeng.xyz/downloads/%E5%BA%8F%E6%97%B6_v2.1.6.apk",
   "forceUpdate": false
 }

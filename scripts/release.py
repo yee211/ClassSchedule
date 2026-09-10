@@ -84,6 +84,20 @@ def update_version_files(version_name: str, version_code: int, changelog: list):
         f.write("\n")
     print("  -> 已更新 data/app_version.json")
 
+    # 1.5 README.md
+    readme_path = os.path.join(ROOT_DIR, "README.md")
+    if os.path.exists(readme_path):
+        with open(readme_path, "r", encoding="utf-8") as f:
+            readme = f.read()
+        readme = re.sub(r"Release-v\d+\.\d+\.\d+", f"Release-v{version_name}", readme)
+        readme = re.sub(r"Android 客户端 \(v\d+\.\d+\.\d+\)", f"Android 客户端 (v{version_name})", readme)
+        quoted_apk = urllib.parse.quote(f"序时_v{version_name}.apk")
+        readme = re.sub(r"%E5%BA%8F%E6%97%B6_v\d+\.\d+\.\d+\.apk", quoted_apk, readme)
+        readme = re.sub(r"序时_v\d+\.\d+\.\d+\.apk", f"序时_v{version_name}.apk", readme)
+        with open(readme_path, "w", encoding="utf-8") as f:
+            f.write(readme)
+        print("  -> 已更新 README.md")
+
 def run_cmd(cmd, cwd):
     print(f"[*] 执行命令: {cmd} (目录: {cwd})")
     res = subprocess.run(cmd, shell=True, cwd=cwd)
