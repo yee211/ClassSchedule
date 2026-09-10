@@ -1,6 +1,6 @@
-# 📅 时序 (ClassSchedule)
+# 📅 序时 (ClassSchedule)
 
-> **「时序如流，亦有星辰守望」** —— 现代化智能课表管理与可视化系统  
+> **「序时如流，亦有星辰守望」** —— 现代化智能课表管理与可视化系统  
 > 物理拟真液态毛玻璃 · 日夜流体动态壁纸 · Excel/AI 双擎解析 · Android/Web 全端自适应
 
 [![FastAPI](https://img.shields.io/badge/FastAPI-0.115+-009688.svg?style=flat-square&logo=fastapi)](https://fastapi.tiangolo.com)
@@ -18,9 +18,9 @@
 | 平台 / 通道 | 访问 / 下载方式 | 说明 |
 | :--- | :--- | :--- |
 | 🌐 **Web 网页版** | [https://api.tanzeng.xyz](https://api.tanzeng.xyz) | 任意现代浏览器秒开，全端自适应，免安装直接体验 |
-| 📱 **Android 客户端 (v2.1.5)** | [🚀 Cloudflare 全球 CDN 极速下载](https://gh-proxy.com/https://raw.githubusercontent.com/yee211/ClassSchedule/main/static/downloads/%E6%97%B6%E5%BA%8F_v2.1.5.apk) | **推荐**，极速 CDN 加速，下载文件名保存为 `时序_v2.1.5.apk` |
-| 📱 **Android 客户端备用** | [🔗 官方服务器直链下载](https://api.tanzeng.xyz/downloads/%E6%97%B6%E5%BA%8F_v2.1.5.apk) | 官方源站直链通道 |
-| 📱 **Android 永久最新直链** | [⚡ 时序.apk 永久最新版](https://api.tanzeng.xyz/downloads/%E6%97%B6%E5%BA%8F.apk) | 始终指向最新稳定构建版 |
+| 📱 **Android 客户端 (v2.1.5)** | [🚀 Cloudflare 全球 CDN 极速下载](https://gh-proxy.com/https://raw.githubusercontent.com/yee211/ClassSchedule/main/static/downloads/%E5%BA%8F%E6%97%B6_v2.1.5.apk) | **推荐**，极速 CDN 加速，下载文件名保存为 `序时_v2.1.5.apk` |
+| 📱 **Android 客户端备用** | [🔗 官方服务器直链下载](https://api.tanzeng.xyz/downloads/%E5%BA%8F%E6%97%B6_v2.1.5.apk) | 官方源站直链通道 |
+| 📱 **Android 永久最新直链** | [⚡ 序时.apk 永久最新版](https://api.tanzeng.xyz/downloads/%E5%BA%8F%E6%97%B6.apk) | 始终指向最新稳定构建版 |
 
 ---
 
@@ -54,7 +54,7 @@
 ### 5. 📱 Android 原生与 Web/PWA 多端深度适配解耦
 - **同一套代码，双端精准分流**：
   - 🌐 **Web 网页端**：浏览器秒开，无多余倒计时弹窗；版本更新在云端热更生效，打开即用。
-  - 📱 **Android 原生端**：Capacitor 容器封装，配有「时序如流，亦有星辰守望」开屏画面与专属时钟桌面图标；应用内集成静默检测与升级弹窗，支持一键极速下载安装。
+  - 📱 **Android 原生端**：Capacitor 容器封装，配有「序时如流，亦有星辰守望」开屏画面与专属时钟桌面图标；应用内集成静默检测与升级弹窗，支持一键极速下载安装。
 
 ---
 
@@ -78,7 +78,7 @@ ClassSchedule/
 │   ├── android/          # Capacitor 原生 Android 封装工程
 │   └── vite.config.js    # Vite 配置文件与 API 反向代理
 ├── static/
-│   └── downloads/        # 移动端安装包分发目录 (时序_v*.apk, 时序.apk, ClassSchedule.apk)
+│   └── downloads/        # 移动端安装包分发目录 (序时_v*.apk, 序时.apk, ClassSchedule.apk)
 ├── data/
 │   └── app_version.json  # 移动端版本分发与热更元数据
 ├── scripts/              # 自动化发布与维护脚本
@@ -167,8 +167,8 @@ python scripts/release.py <版本号, 如 2.1.5> <版本代码, 如 7> "更新�
 ```
 
 脚本将自动生成：
-- `static/downloads/时序_v{version}.apk`（带版本号专属安装包）
-- `static/downloads/时序.apk`（永久最新稳定版）
+- `static/downloads/序时_v{version}.apk`（带版本号专属安装包）
+- `static/downloads/序时.apk`（永久最新稳定版）
 - `static/downloads/ClassSchedule.apk`（历史兼容包）
 - 自动更新 `data/app_version.json` 的版本元数据与 URL 编码下载直链。
 
