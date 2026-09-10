@@ -183,12 +183,14 @@ html[data-bg="night"] .corner {
 }
 
 html[data-bg="night"] .header-action,
+html[data-bg="night"] .uiverse-button,
 html[data-bg="night"] .week-nav,
 html[data-bg="night"] .week-trigger,
 html[data-bg="night"] .reset-week {
   color: #f1f5f9 !important;
   background: rgba(15, 23, 42, 0.32) !important;
   border-color: rgba(148, 163, 184, 0.25) !important;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.25), inset 0 1px 0.5px rgba(255, 255, 255, 0.15) !important;
 }
 
 /* =========================================
@@ -552,31 +554,16 @@ html[data-bg="frosted"] .ambient-canvas {
 
 .week-nav {
   border: 1px solid rgba(255, 255, 255, 0.75);
-  background: rgba(255, 255, 255, 0.52);
-  backdrop-filter: none;
-  -webkit-backdrop-filter: none;
-  border-radius: 14px;
+  border-radius: 30em;
   width: 40px;
   height: 42px;
   display: flex;
   align-items: center;
   justify-content: center;
-  color: #334155;
+  color: #1e293b;
   cursor: pointer;
-  box-shadow: 0 2px 8px rgba(50, 75, 110, 0.06), inset 0 1px 0.5px rgba(255, 255, 255, 0.9);
-  transition: all 0.2s cubic-bezier(0.34, 1.56, 0.64, 1);
   font-size: 1.15rem;
-}
-
-.week-nav:hover {
-  transform: translateY(-1px);
-  background: rgba(255, 255, 255, 0.85);
-  color: #0f172a;
-  box-shadow: 0 5px 14px rgba(50, 75, 110, 0.12), inset 0 1px 0.5px #fff;
-}
-
-.week-nav:active {
-  transform: scale(0.96);
+  font-weight: 600;
 }
 
 .week-nav:disabled {
@@ -1257,13 +1244,13 @@ html[data-bg="frosted"] .ambient-canvas {
     position: sticky;
     left: 0;
     z-index: 6;
-    background: rgba(255, 255, 255, 0.72);
-    backdrop-filter: blur(14px);
-    -webkit-backdrop-filter: blur(14px);
+    background: transparent !important;
+    backdrop-filter: none !important;
+    -webkit-backdrop-filter: none !important;
   }
   html[data-bg="night"] .corner,
   html[data-bg="night"] .section {
-    background: rgba(15, 23, 42, 0.88);
+    background: transparent !important;
     color: #f1f5f9;
   }
   .corner {
@@ -1275,10 +1262,12 @@ html[data-bg="frosted"] .ambient-canvas {
   .corner-month {
     font-size: 0.62rem;
     line-height: 1.1;
+    text-shadow: 0 1px 2px rgba(255, 255, 255, 0.85);
   }
   .corner-label {
     font-size: 0.72rem;
     line-height: 1.15;
+    text-shadow: 0 1px 2px rgba(255, 255, 255, 0.85);
   }
   .day {
     padding: 2px 1px;
@@ -1302,12 +1291,20 @@ html[data-bg="frosted"] .ambient-canvas {
   .section-num {
     font-size: 0.78rem;
     line-height: 1.1;
+    text-shadow: 0 1px 2px rgba(255, 255, 255, 0.85);
   }
   .section-times {
     font-size: 0.5rem;
     line-height: 1.05;
     letter-spacing: -0.4px;
     margin-top: 1px;
+    text-shadow: 0 1px 2px rgba(255, 255, 255, 0.85);
+  }
+  html[data-bg="night"] .section-num,
+  html[data-bg="night"] .section-times,
+  html[data-bg="night"] .corner-month,
+  html[data-bg="night"] .corner-label {
+    text-shadow: 0 1px 3px rgba(0, 0, 0, 0.9);
   }
   .course {
     padding: 3px 2px;

@@ -64,7 +64,7 @@ onUnmounted(() => {
   <section class="toolbar glass" aria-label="课表控制">
     <div class="term-picker">
       <p>当前学期</p>
-      <label v-if="schedules.length > 1" class="term-select-wrap">
+      <label v-if="schedules.length > 1" class="term-select-wrap uiverse-button">
         <span class="sr-only">切换学期</span>
         <select :value="schedule?.id" aria-label="切换学期" @change="onSelectSchedule">
           <option v-for="item in schedules" :key="item.id" :value="item.id">
@@ -76,16 +76,16 @@ onUnmounted(() => {
       <h1 v-else>{{ schedule?.term || '我的课表' }}</h1>
     </div>
     <div class="week-picker">
-      <button class="week-nav" aria-label="上一周" :disabled="week <= 1" @click="prevWeek">‹</button>
+      <button class="week-nav uiverse-button" aria-label="上一周" :disabled="week <= 1" @click="prevWeek">‹</button>
       <div class="week-menu" @click.stop>
-        <button class="week-trigger" :aria-expanded="weekMenuOpen" aria-haspopup="listbox" @click="toggleWeekMenu">
+        <button class="week-trigger uiverse-button" :aria-expanded="weekMenuOpen" aria-haspopup="listbox" @click="toggleWeekMenu">
           <span><b>第{{ week }}周</b><small>{{ weekRange(schedule?.start_date, week) }}</small></span>
           <i :class="{ open: weekMenuOpen }">⌄</i>
         </button>
         <div v-if="weekMenuOpen" class="week-menu-panel glass" role="listbox" aria-label="选择周次">
           <div class="week-menu-head">
             <b>选择周次</b>
-            <button type="button" @click="onGoCurrentWeek">回到本周</button>
+            <button type="button" class="uiverse-button" @click="onGoCurrentWeek">回到本周</button>
           </div>
           <div class="week-menu-grid">
             <button
@@ -103,13 +103,13 @@ onUnmounted(() => {
         </div>
       </div>
       <button
-        class="reset-week"
+        class="reset-week uiverse-button"
         :class="{ active: week !== currentWeek }"
         @click="onGoCurrentWeek"
       >
         {{ week === currentWeek ? '本周' : '回到本周' }}
       </button>
-      <button class="week-nav" aria-label="下一周" :disabled="week >= weekOptions.length" @click="nextWeek">›</button>
+      <button class="week-nav uiverse-button" aria-label="下一周" :disabled="week >= weekOptions.length" @click="nextWeek">›</button>
     </div>
   </section>
 </template>

@@ -523,21 +523,10 @@ html[data-bg="night"] .term-select-wrap i {
   justify-content: space-between;
   gap: 8px;
   padding: 5px 14px;
-  border: 1px solid rgba(255, 255, 255, 0.75);
-  border-radius: 14px;
-  background: rgba(255, 255, 255, 0.58);
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
+  border-radius: 30em;
   color: #172033;
   cursor: pointer;
   text-align: left;
-  box-shadow: 0 2px 8px rgba(50, 75, 110, 0.06), inset 0 1px 0.5px #fff;
-  transition: all 0.22s cubic-bezier(0.34, 1.56, 0.64, 1);
-}
-
-.week-trigger:hover {
-  background: rgba(255, 255, 255, 0.82);
-  transform: translateY(-1px);
 }
 
 .week-trigger span {
@@ -673,34 +662,30 @@ html[data-bg="night"] .term-select-wrap i {
 }
 
 .reset-week {
-  border: 1px solid rgba(255, 255, 255, 0.75)!important;
-  min-width: 76px!important;
+  min-width: 76px;
   height: 42px;
-  font-size: 0.8rem!important;
-  color: #475569!important;
-  border-radius: 14px!important;
-  background: rgba(255, 255, 255, 0.52)!important;
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
-  box-shadow: 0 2px 8px rgba(50, 75, 110, 0.06), inset 0 1px 0.5px #fff;
+  font-size: 0.84rem;
+  font-weight: 600;
+  color: #1e293b;
+  border-radius: 30em;
   cursor: pointer;
-  transition: all 0.2s cubic-bezier(0.34, 1.56, 0.64, 1);
   display: inline-flex;
   align-items: center;
   justify-content: center;
   white-space: nowrap;
 }
 
-.reset-week:hover {
-  background: rgba(255, 255, 255, 0.85)!important;
-  transform: translateY(-1px);
+.reset-week.active {
+  background: linear-gradient(135deg, rgba(56, 189, 248, 0.35) 0%, rgba(129, 140, 248, 0.35) 100%) !important;
+  color: #0369a1 !important;
+  border-color: rgba(56, 189, 248, 0.6) !important;
+  box-shadow: 0 6px 16px -2px rgba(14, 165, 233, 0.25), inset 0 1.5px 0.5px #fff !important;
 }
 
-.reset-week.active {
-  background: linear-gradient(135deg, #1e293b, #0f172a)!important;
-  color: #fff!important;
-  border-color: rgba(255, 255, 255, 0.15)!important;
-  box-shadow: 0 4px 12px rgba(15, 23, 42, 0.2), inset 0 1px 0.5px rgba(255, 255, 255, 0.3);
+html[data-bg="night"] .reset-week.active {
+  background: linear-gradient(135deg, rgba(56, 189, 248, 0.25) 0%, rgba(129, 140, 248, 0.25) 100%) !important;
+  color: #f8fafc !important;
+  border-color: rgba(56, 189, 248, 0.5) !important;
 }
 
 
@@ -897,14 +882,7 @@ html[data-bg="night"] .term-select-wrap i {
 }
 
 html[data-bg="night"] .week-trigger {
-  background: rgba(15, 23, 42, 0.55);
-  border-color: rgba(148, 163, 184, 0.28);
   color: #f8fafc;
-  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.3), inset 0 1px 0.5px rgba(255, 255, 255, 0.15);
-}
-
-html[data-bg="night"] .week-trigger:hover {
-  background: rgba(30, 41, 59, 0.72);
 }
 
 html[data-bg="night"] .week-trigger small,
@@ -983,8 +961,8 @@ html[data-bg="night"] .user-badge {
   }
   .week-trigger {
     height: 30px;
-    padding: 2px 6px;
-    border-radius: 8px;
+    padding: 2px 8px;
+    border-radius: 20px;
   }
   .week-trigger b {
     font-size: 0.78rem;
@@ -997,7 +975,7 @@ html[data-bg="night"] .user-badge {
     left: 0;
     width: min(340px, calc(100vw - 16px));
     padding: 10px;
-    border-radius: 14px;
+    border-radius: 16px;
   }
   .week-menu-grid {
     grid-template-columns: repeat(3, minmax(0, 1fr));
@@ -1006,7 +984,7 @@ html[data-bg="night"] .user-badge {
   .week-option {
     min-height: 44px;
     padding: 3px 2px;
-    border-radius: 8px;
+    border-radius: 12px;
   }
   .week-option b {
     font-size: 0.74rem;
@@ -1016,17 +994,17 @@ html[data-bg="night"] .user-badge {
   }
   .reset-week {
     height: 30px;
-    min-width: 44px !important;
-    padding: 0 6px !important;
-    font-size: 0.72rem;
-    border-radius: 8px;
+    min-width: 46px;
+    padding: 0 8px;
+    font-size: 0.74rem;
+    border-radius: 20px;
   }
   .week-nav {
     height: 30px;
     width: 28px;
     flex: 0 0 28px;
-    border-radius: 8px;
-    font-size: 0.9rem;
+    border-radius: 20px;
+    font-size: 0.95rem;
   }
 }
 </style>
