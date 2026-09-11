@@ -20,3 +20,31 @@ def test_distribute_apk_creates_identical_aliases(tmp_path, monkeypatch):
     ]
     assert {Path(path).read_bytes() for path in targets} == {source.read_bytes()}
     assert len({release.calc_sha256(path) for path in targets}) == 1
+
+
+def test_generate_release_notes():
+    notes = release.generate_release_notes(
+        "1.2.3",
+        4,
+        ["特性 1", "修复 2"],
+        {
+            "size_mb": 5.2,
+            "size_bytes": 5452595,
+            "md5": "TESTMD5",
+            "sha256": "TESTSHA256",
+            "cert_sha256": "TESTCERTSHA256",
+        },
+    )
+    assert "序时 (ClassSchedule) v1.2.3" in notes
+    assert "- 特性 1" in notes
+    assert "- 修复 2" in notes
+    assert "TESTMD5" in notes
+    assert "TESTSHA256" in notes
+    assert "TESTCERTSHA256" in notes
+    assert "序时_v1.2.3.apk" in notes
+
+
+def test_get_github_repo(monkeypatch):
+    monkeypatch.setattr(release, "run_capture", lambda *args, **kwargs: "https://github.com/testowner/testrepo.git")
+    assert release.get_github_repo() == ("testowner", "testrepo")
+

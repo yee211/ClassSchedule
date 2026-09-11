@@ -11,7 +11,9 @@ import shutil
 import subprocess
 import sys
 import tempfile
+import urllib.error
 import urllib.parse
+import urllib.request
 from pathlib import Path
 
 from dotenv import load_dotenv
@@ -277,15 +279,275 @@ def validate_release(version_name: str, version_code: int) -> None:
     if not Path(os.environ["ANDROID_KEYSTORE_PATH"]).is_file():
         raise ValueError("ANDROID_KEYSTORE_PATH 指向的签名文件不存在")
 
+
+def get_github_token() -> str | None:
+    token = os.getenv("GITHUB_TOKEN") or os.getenv("GH_TOKEN")
+    if token and token.strip():
+        return token.strip()
+    try:
+        p = subprocess.Popen(
+            ["git", "credential", "fill"],
+            stdin=subprocess.PIPE,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.DEVNULL,
+            text=True,
+            cwd=ROOT_DIR,
+        )
+        out, _ = p.communicate("protocol=https\nhost=github.com\n")
+        for line in out.splitlines():
+            if line.startswith("password="):
+                candidate = line.split("=", 1)[1].strip()
+                if candidate:
+                    return candidate
+    except Exception:
+        pass
+    return None
+
+
+def get_github_repo() -> tuple[str, str]:
+    try:
+        url = run_capture(["git", "config", "--get", "remote.origin.url"], cwd=ROOT_DIR)
+        match = re.search(r"github\.com[:/]([^/]+)/([^/\.]+)", url)
+        if match:
+            return match.group(1), match.group(2)
+    except Exception:
+        pass
+    return "yee211", "ClassSchedule"
+
+
+def sync_git_tag(version_name: str) -> None:
+    tag = f"v{version_name}"
+    try:
+        existing = run_capture(["git", "tag", "-l", tag], cwd=ROOT_DIR)
+        if not existing:
+            run_cmd(["git", "tag", "-a", tag, "-m", f"release: {tag}"], cwd=ROOT_DIR)
+            print(f"  -> 已创建本地 Git Tag: {tag}")
+            run_cmd(["git", "push", "origin", tag], cwd=ROOT_DIR)
+            print(f"  -> 已推送 Git Tag 至远程: {tag}")
+        else:
+            print(f"  -> Git Tag {tag} 已存在，跳过创建")
+    except Exception as e:
+        print(f"  [!] Git Tag 处理提示: {e}")
+
+
+def generate_release_notes(version_name: str, version_code: int, changelog: list[str], apk_info: dict) -> str:
+    quoted_apk = urllib.parse.quote(f"序时_v{version_name}.apk")
+    bullets = "\n".join(f"- {item}" for item in changelog) if changelog else "- 常规优化与体验提升"
+    size_mb = apk_info.get("size_mb", 0.0)
+    size_bytes = apk_info.get("size_bytes", 0)
+    md5_val = apk_info.get("md5", "")
+    sha256_val = apk_info.get("sha256", "")
+    cert_sha256 = apk_info.get("cert_sha256", "")
+
+    return f"""## 📅 序时 (ClassSchedule) v{version_name}
+
+> **「序时如流，亦有星辰守望」**
+
+### 📱 多端访问与下载
+
+| 平台 | 访问 / 下载通道 | 说明 |
+| :--- | :--- | :--- |
+| 🌐 **Web 网页版** | [https://api.tanzeng.xyz](https://api.tanzeng.xyz) | 浏览器免安装秒开，全端自适应，实时热更 |
+| 📱 **Android 客户端 (v{version_name})** | 点击下方 Releases 附件下载 `序时_v{version_name}.apk` | 极速安装，独享开屏与桌面星轨时钟图标 |
+| 🚀 **全球 CDN 直链** | [Cloudflare CDN 极速下载](https://gh-proxy.com/https://raw.githubusercontent.com/yee211/ClassSchedule/main/static/downloads/{quoted_apk}) | 国内外极速分发通道 |
+| 🔗 **官方服务器直链** | [官方源站直链下载](https://api.tanzeng.xyz/downloads/{quoted_apk}) | 官方源站下载通道 |
+| ⚡ **永久最新直链** | [序时.apk 永久最新版](https://api.tanzeng.xyz/downloads/%E5%BA%8F%E6%97%B6.apk) | 始终指向最新稳定构建版 |
+
+---
+
+### ✨ 本次更新内容 (Changelog)
+{bullets}
+
+---
+
+### 🛡️ 安装包校验信息
+- **应用包名 (Application ID)**：{APPLICATION_ID}
+- **版本号 (versionName / versionCode)**：v{version_name} / {version_code}
+- **文件体积**：{size_mb:.2f} MB ({size_bytes:,} 字节)
+- **MD5 校验码**：{md5_val}
+- **SHA-256 校验码**：{sha256_val}
+- **签名证书 SHA-256**：{cert_sha256}
+"""
+
+
+def publish_github_release(
+    version_name: str,
+    version_code: int,
+    changelog: list[str],
+    apk_info: dict,
+    apk_files: list[Path],
+    token: str | None = None,
+) -> str | None:
+    print(f"\n[*] 7. 发布 GitHub Release v{version_name}...")
+    token = token or get_github_token()
+    if not token:
+        print("  [!] 未找到 GitHub 认证 Token (可通过环境变量 GITHUB_TOKEN 或 Git 凭据管理器配置)，跳过 GitHub Release。")
+        return None
+
+    owner, repo = get_github_repo()
+    tag_name = f"v{version_name}"
+    sync_git_tag(version_name)
+
+    notes = generate_release_notes(version_name, version_code, changelog, apk_info)
+    title = f"序时 v{version_name} - 「序时如流，亦有星辰守望」"
+
+    headers = {
+        "Authorization": f"token {token}",
+        "User-Agent": "ClassSchedule-Release-Script",
+        "Accept": "application/vnd.github.v3+json",
+    }
+    tag_url = f"https://api.github.com/repos/{owner}/{repo}/releases/tags/{tag_name}"
+    existing_release = None
+    req = urllib.request.Request(tag_url, headers=headers)
+    try:
+        with urllib.request.urlopen(req, timeout=30) as resp:
+            existing_release = json.loads(resp.read().decode("utf-8"))
+    except urllib.error.HTTPError as e:
+        if e.code != 404:
+            print(f"  [!] 获取已有 Release 失败: HTTP {e.code}")
+            return None
+
+    payload = {
+        "tag_name": tag_name,
+        "target_commitish": "main",
+        "name": title,
+        "body": notes,
+        "draft": False,
+        "prerelease": False,
+    }
+    payload_bytes = json.dumps(payload, ensure_ascii=False).encode("utf-8")
+
+    if existing_release:
+        release_id = existing_release["id"]
+        patch_url = f"https://api.github.com/repos/{owner}/{repo}/releases/{release_id}"
+        patch_req = urllib.request.Request(
+            patch_url,
+            data=payload_bytes,
+            headers={**headers, "Content-Type": "application/json; charset=utf-8"},
+            method="PATCH",
+        )
+        with urllib.request.urlopen(patch_req, timeout=30) as resp:
+            release_data = json.loads(resp.read().decode("utf-8"))
+        print(f"  -> 已更新已有 Release: {release_data.get('html_url')}")
+    else:
+        post_url = f"https://api.github.com/repos/{owner}/{repo}/releases"
+        post_req = urllib.request.Request(
+            post_url,
+            data=payload_bytes,
+            headers={**headers, "Content-Type": "application/json; charset=utf-8"},
+            method="POST",
+        )
+        with urllib.request.urlopen(post_req, timeout=30) as resp:
+            release_data = json.loads(resp.read().decode("utf-8"))
+        print(f"  -> 已成功创建 Release: {release_data.get('html_url')}")
+
+    release_id = release_data["id"]
+    upload_url_template = release_data.get("upload_url", "")
+    base_upload_url = upload_url_template.split("{")[0]
+
+    assets_url = f"https://api.github.com/repos/{owner}/{repo}/releases/{release_id}/assets"
+    try:
+        with urllib.request.urlopen(urllib.request.Request(assets_url, headers=headers), timeout=30) as resp:
+            current_assets = json.loads(resp.read().decode("utf-8"))
+    except Exception:
+        current_assets = []
+
+    primary_apk = apk_files[0]
+    upload_targets = [
+        (f"序时_v{version_name}.apk", primary_apk),
+        (f"XuShi_v{version_name}.apk", primary_apk),
+        ("ClassSchedule.apk", primary_apk),
+    ]
+
+    for asset_name, file_path in upload_targets:
+        for existing_asset in current_assets:
+            if existing_asset.get("name") == asset_name:
+                del_url = f"https://api.github.com/repos/{owner}/{repo}/releases/assets/{existing_asset['id']}"
+                del_req = urllib.request.Request(del_url, headers=headers, method="DELETE")
+                try:
+                    with urllib.request.urlopen(del_req, timeout=30):
+                        print(f"  -> 已移除旧版附件: {asset_name}")
+                except Exception as e:
+                    print(f"  [!] 移除旧附件 {asset_name} 警告: {e}")
+
+        quoted_name = urllib.parse.quote(asset_name)
+        upload_endpoint = f"{base_upload_url}?name={quoted_name}"
+        data = file_path.read_bytes()
+        upload_headers = {
+            "Authorization": f"token {token}",
+            "User-Agent": "ClassSchedule-Release-Script",
+            "Content-Type": "application/vnd.android.package-archive",
+            "Content-Length": str(len(data)),
+        }
+        upload_req = urllib.request.Request(upload_endpoint, data=data, headers=upload_headers, method="POST")
+        try:
+            with urllib.request.urlopen(upload_req, timeout=180) as resp:
+                if resp.status in (200, 201):
+                    print(f"  -> 附件上传成功: {asset_name} ({len(data) / (1024 * 1024):.2f} MB)")
+                else:
+                    print(f"  [!] 附件上传异常: {asset_name} (HTTP {resp.status})")
+        except Exception as e:
+            print(f"  [!] 上传附件 {asset_name} 失败: {e}")
+
+    return release_data.get("html_url")
+
+
+def publish_existing_github_release(version_name: str | None = None) -> None:
+    app_version_path = os.path.join(ROOT_DIR, "data", "app_version.json")
+    with open(app_version_path, "r", encoding="utf-8") as f:
+        ver_info = json.load(f)
+
+    if not version_name:
+        version_name = ver_info.get("versionName")
+    version_code = ver_info.get("versionCode", 1)
+    changelog = ver_info.get("changelog", ["常规优化与体验提升"])
+
+    apk_path = Path(STATIC_DOWNLOAD_DIR) / f"序时_v{version_name}.apk"
+    if not apk_path.is_file():
+        apk_path = Path(BUILT_APK)
+    if not apk_path.is_file():
+        raise FileNotFoundError(f"未找到对应版本的 Release APK: {apk_path}")
+
+    print(f"[*] 准备为已构建版本 v{version_name} (code: {version_code}) 发布 GitHub Release...")
+    cert_sha256 = verify_apk(str(apk_path), version_name, version_code)
+    size_bytes = apk_path.stat().st_size
+    apk_info = {
+        "size_bytes": size_bytes,
+        "size_mb": size_bytes / (1024 * 1024),
+        "md5": calc_md5(apk_path),
+        "sha256": calc_sha256(apk_path),
+        "cert_sha256": cert_sha256,
+    }
+    url = publish_github_release(
+        version_name,
+        version_code,
+        changelog,
+        apk_info,
+        [apk_path],
+    )
+    if url:
+        print(f"\n[+] GitHub Release 发布完成: {url}")
+
+
 def main():
-    if len(sys.argv) < 3:
-        print("用法: python scripts/release.py <version_name> <version_code> [changelog1] [changelog2] ...")
+    if len(sys.argv) >= 2 and sys.argv[1] in ("--publish-github", "-p"):
+        version_name = sys.argv[2] if len(sys.argv) > 2 else None
+        publish_existing_github_release(version_name)
+        return
+
+    args = [arg for arg in sys.argv[1:] if not arg.startswith("--")]
+    flags = [arg for arg in sys.argv[1:] if arg.startswith("--")]
+
+    if len(args) < 2:
+        print("用法: python scripts/release.py <version_name> <version_code> [changelog1] [changelog2] ... [--no-github]")
         print("示例: python scripts/release.py 2.1.3 5 \"修复已知问题\" \"优化界面交互\"")
+        print("仅发布已有版本至 GitHub: python scripts/release.py --publish-github [version_name]")
         sys.exit(1)
 
-    version_name = sys.argv[1]
-    version_code = int(sys.argv[2])
-    changelog = sys.argv[3:] if len(sys.argv) > 3 else ["常规优化与体验提升"]
+    version_name = args[0]
+    version_code = int(args[1])
+    changelog = args[2:] if len(args) > 2 else ["常规优化与体验提升"]
+    skip_github = "--no-github" in flags
 
     validate_release(version_name, version_code)
     snapshots = {path: Path(path).read_bytes() for path in VERSION_FILES if os.path.exists(path)}
@@ -329,15 +591,37 @@ def main():
     apk_versioned = distributed[0]
     size_mb = apk_versioned.stat().st_size / (1024 * 1024)
     md5_val = calc_md5(apk_versioned)
+    sha256_val = calc_sha256(apk_versioned)
 
     print("\n[*] 6. 本地安装包构建与校验成功！")
     for item in distributed:
         print(f"  -> {item.name}: {item}")
     print(f"  -> 文件大小: {size_mb:.2f} MB")
-    sha256_val = calc_sha256(apk_versioned)
     print(f"  -> MD5 校验: {md5_val}")
     print(f"  -> SHA-256 校验: {sha256_val}")
     print(f"  -> 签名证书 SHA-256: {certificate_sha256}")
+
+    apk_info = {
+        "size_bytes": apk_versioned.stat().st_size,
+        "size_mb": size_mb,
+        "md5": md5_val,
+        "sha256": sha256_val,
+        "cert_sha256": certificate_sha256,
+    }
+
+    if not skip_github:
+        try:
+            gh_url = publish_github_release(
+                version_name,
+                version_code,
+                changelog,
+                apk_info,
+                distributed,
+            )
+            if gh_url:
+                print(f"  -> GitHub Release: {gh_url}")
+        except Exception as e:
+            print(f"  [!] GitHub Release 发布异常 (可后续通过 --publish-github 重试): {e}")
 
     print("\n==================================================")
     print(" 本地构建完成；完成服务器同步与线上复核后才算发布完成。")
@@ -347,5 +631,7 @@ def main():
     print(" 4. 在宝塔终端执行: cd /www/wwwroot/ClassSchedule && git pull origin main")
     print("==================================================")
 
+
 if __name__ == "__main__":
     main()
+
