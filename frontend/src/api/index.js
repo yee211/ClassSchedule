@@ -128,6 +128,35 @@ export const coursesApi = {
   async delete(id) {
     return api(`/api/courses/${id}`, { method: 'DELETE' });
   },
+  async adjust(id, week, data) {
+    return api(`/api/courses/${id}/adjustments/${week}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(data),
+    });
+  },
+  async cancelAdjustment(id, week) {
+    return api(`/api/courses/${id}/adjustments/${week}`, { method: 'DELETE' });
+  },
+};
+
+export const adjustmentsApi = {
+  async parse(file, scheduleId) {
+    const form = new FormData();
+    form.append('file', file);
+    form.append('schedule_id', String(scheduleId));
+    const signal = typeof AbortSignal !== 'undefined' && AbortSignal.timeout
+      ? AbortSignal.timeout(30000)
+      : undefined;
+    return api('/api/adjustments/parse', { method: 'POST', body: form, signal });
+  },
+  async apply(scheduleId, items) {
+    return api('/api/adjustments/apply', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ schedule_id: scheduleId, items }),
+    });
+  },
 };
 
 export const importerApi = {
@@ -148,4 +177,3 @@ export const appApi = {
     return api('/api/app/version');
   },
 };
-

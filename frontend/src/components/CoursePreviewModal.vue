@@ -13,7 +13,7 @@ const props = defineProps({
   colorMap: { type: Map, default: () => new Map() },
 });
 
-const emit = defineEmits(['close', 'edit']);
+const emit = defineEmits(['close', 'edit', 'adjust']);
 
 const courseHexColor = computed(() => {
   if (!props.course) return '#5B8DEF';
@@ -50,6 +50,9 @@ const courseHexColor = computed(() => {
       <div class="modal-actions">
         <span></span>
         <button class="uiverse-button" type="button" @click="emit('close')">关闭</button>
+        <button class="uiverse-button" type="button" @click="emit('adjust', course)">
+          {{ course?.adjusted_week ? '修改调课' : '调课' }}
+        </button>
         <button class="primary uiverse-button" type="button" @click="emit('edit', course)">编辑</button>
       </div>
     </section>

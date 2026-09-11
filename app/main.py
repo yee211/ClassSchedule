@@ -8,7 +8,7 @@ from fastapi.staticfiles import StaticFiles
 
 from .db import close_pool, connect, init_pool
 from .observability import configure_logging, request_metrics_middleware
-from .routers import app_update, auth, courses, importer, schedules
+from .routers import adjustments, app_update, auth, courses, importer, schedules
 from .settings import settings
 
 ROOT = Path(__file__).resolve().parent.parent
@@ -43,6 +43,7 @@ app.mount("/downloads", StaticFiles(directory=DOWNLOADS_DIR), name="downloads")
 app.include_router(auth.router)
 app.include_router(schedules.router)
 app.include_router(courses.router)
+app.include_router(adjustments.router)
 app.include_router(importer.router)
 app.include_router(app_update.router)
 

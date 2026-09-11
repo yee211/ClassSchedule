@@ -13,6 +13,7 @@ const emit = defineEmits([
   'delete-schedule',
   'add-course',
   'upload',
+  'upload-adjustment',
   'logout',
   'toggle-night-mode',
   'check-update',
@@ -22,6 +23,10 @@ const userMenuRef = ref(null);
 
 function onUpload(event) {
   emit('upload', event);
+}
+
+function onAdjustmentUpload(event) {
+  emit('upload-adjustment', event);
 }
 
 function closeUserMenu(event) {
@@ -58,6 +63,12 @@ onUnmounted(() => {
         <span aria-hidden="true">↑</span>
         <span class="action-text">上传课表</span>
         <span class="action-text-short">导入</span>
+      </label>
+      <label class="header-action upload uiverse-button" title="AI 识别调课通知">
+        <input type="file" accept="image/jpeg,image/png,image/webp" @change="onAdjustmentUpload">
+        <span aria-hidden="true">⇄</span>
+        <span class="action-text">调课通知</span>
+        <span class="action-text-short">调课</span>
       </label>
       <button
         v-if="isNative"

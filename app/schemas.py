@@ -47,3 +47,11 @@ class CourseIn(BaseModel):
         if any(week < 1 or week > 30 for week in value):
             raise ValueError("周次必须在 1 到 30 之间")
         return sorted(set(value))
+
+
+class CourseAdjustmentIn(BaseModel):
+    week: int = Field(ge=1, le=30)
+    weekday: int = Field(ge=1, le=7)
+    start_section: int = Field(ge=1, le=12)
+    end_section: int = Field(ge=1, le=12)
+    room: str = Field(default="", max_length=40)

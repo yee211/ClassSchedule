@@ -105,6 +105,18 @@ def init_db():
         db.execute("ALTER TABLE schedules ALTER COLUMN user_id SET NOT NULL")
         # 索引优化：外键关联与高频查询加速
         db.execute("CREATE INDEX IF NOT EXISTS idx_courses_schedule_id ON courses(schedule_id)")
+        db.execute("""CREATE TABLE IF NOT EXISTS course_adjustments (
+            id BIGSERIAL PRIMARY KEY,
+            course_id BIGINT NOT NULL REFERENCES courses(id) ON DELETE CASCADE,
+            week SMALLINT NOT NULL CHECK (week BETWEEN 1 AND 30),
+            weekday SMALLINT NOT NULL CHECK (weekday BETWEEN 1 AND 7),
+            start_section SMALLINT NOT NULL CHECK (start_section BETWEEN 1 AND 12),
+            end_section SMALLINT NOT NULL CHECK (end_section BETWEEN 1 AND 12),
+            room VARCHAR(40) NOT NULL DEFAULT '',
+            created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            UNIQUE (course_id, week),
+            CHECK (end_section >= start_section))""")
+        db.execute("CREATE INDEX IF NOT EXISTS idx_course_adjustments_course_id ON course_adjustments(course_id)")
         db.execute("CREATE INDEX IF NOT EXISTS idx_schedules_user_id ON schedules(user_id)")
         db.execute("CREATE INDEX IF NOT EXISTS idx_schedules_user_id_term ON schedules(user_id, term)")
 

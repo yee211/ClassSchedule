@@ -47,8 +47,19 @@ def list_schedules(user=Depends(get_current_user)):
         ).fetchall()
 
         courses_by_schedule: dict[int, list[dict]] = {sid: [] for sid in schedule_ids}
+        course_ids = [course["id"] for course in courses_rows]
+        adjustments_by_course: dict[int, list[dict]] = {cid: [] for cid in course_ids}
+        if course_ids:
+            adjustment_rows = db.execute(
+                "SELECT * FROM course_adjustments WHERE course_id = ANY(%s) ORDER BY week",
+                (course_ids,),
+            ).fetchall()
+            for adjustment in adjustment_rows:
+                adjustments_by_course[adjustment["course_id"]].append(row_dict(adjustment))
         for course in courses_rows:
-            courses_by_schedule[course["schedule_id"]].append(row_dict(course))
+            item = row_dict(course)
+            item["adjustments"] = adjustments_by_course.get(course["id"], [])
+            courses_by_schedule[course["schedule_id"]].append(item)
 
         result = []
         for row in rows:
@@ -102,4 +113,3 @@ def delete_schedule(schedule_id: int, user=Depends(get_current_user)):
             (schedule_id, user["id"]),
         ).fetchone():
             raise HTTPException(404, "课表不存在")
-

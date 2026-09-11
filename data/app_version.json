@@ -1,14 +1,14 @@
 {
-  "versionCode": 9,
-  "versionName": "2.1.7",
+  "versionCode": 10,
+  "versionName": "2.2.0",
   "minVersionCode": 1,
-  "title": "发现新版本 v2.1.7",
+  "title": "发现新版本 v2.2.0",
   "changelog": [
-    "优化移动端学期与周次选择布局",
-    "修复窄屏工具栏及下拉面板溢出",
-    "增强安全配置与签名发布校验"
+    "新增单周调课与撤销功能",
+    "支持 AI 识别调课通知并批量应用",
+    "支持拖动课程快速调整时间并检测冲突"
   ],
-  "downloadUrl": "https://gh-proxy.com/https://raw.githubusercontent.com/yee211/ClassSchedule/main/static/downloads/%E5%BA%8F%E6%97%B6_v2.1.7.apk",
-  "backupDownloadUrl": "https://api.tanzeng.xyz/downloads/%E5%BA%8F%E6%97%B6_v2.1.7.apk",
+  "downloadUrl": "https://gh-proxy.com/https://raw.githubusercontent.com/yee211/ClassSchedule/main/static/downloads/%E5%BA%8F%E6%97%B6_v2.2.0.apk",
+  "backupDownloadUrl": "https://api.tanzeng.xyz/downloads/%E5%BA%8F%E6%97%B6_v2.2.0.apk",
   "forceUpdate": false
 }
