@@ -105,6 +105,9 @@ export const schedulesApi = {
       body: JSON.stringify(data),
     });
   },
+  async ensureAdjusted(id) {
+    return api(`/api/schedules/${id}/adjusted`, { method: 'POST' });
+  },
   async delete(id) {
     return api(`/api/schedules/${id}`, { method: 'DELETE' });
   },

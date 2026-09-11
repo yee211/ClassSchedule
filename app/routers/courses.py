@@ -9,6 +9,11 @@ from ..schemas import CourseAdjustmentIn, CourseIn
 router = APIRouter(prefix="/api/courses", tags=["courses"])
 
 
+def reject_original_schedule(row) -> None:
+    if row and row.get("variant_type") == "original":
+        raise HTTPException(409, "原始导入课表为只读，请先创建调课版")
+
+
 def adjustment_conflicts(db, course_id: int, week: int, weekday: int, start_section: int, end_section: int) -> bool:
     owner = db.execute("SELECT schedule_id FROM courses WHERE id=%s", (course_id,)).fetchone()
     if not owner:
@@ -53,11 +58,13 @@ def add_course(course: CourseIn, user=Depends(get_current_user)):
     if course.end_section < course.start_section:
         raise HTTPException(400, "结束节次不能早于开始节次")
     with connect() as db:
-        if not db.execute(
-            "SELECT 1 FROM schedules WHERE id=%s AND user_id=%s",
+        target_schedule = db.execute(
+            "SELECT variant_type FROM schedules WHERE id=%s AND user_id=%s",
             (course.schedule_id, user["id"]),
-        ).fetchone():
+        ).fetchone()
+        if not target_schedule:
             raise HTTPException(404, "课表不存在")
+        reject_original_schedule(target_schedule)
         row = db.execute(
             """INSERT INTO courses
             (schedule_id,name,teacher,room,weekday,start_section,end_section,weeks,color)
@@ -76,17 +83,21 @@ def update_course(course_id: int, course: CourseIn, source: str = "manual", user
     if course.end_section < course.start_section:
         raise HTTPException(400, "结束节次不能早于开始节次")
     with connect() as db:
-        if not db.execute(
-            "SELECT 1 FROM schedules WHERE id=%s AND user_id=%s",
+        target_schedule = db.execute(
+            "SELECT variant_type FROM schedules WHERE id=%s AND user_id=%s",
             (course.schedule_id, user["id"]),
-        ).fetchone():
+        ).fetchone()
+        if not target_schedule:
             raise HTTPException(404, "课表不存在")
+        reject_original_schedule(target_schedule)
         old_course = db.execute(
-            "SELECT * FROM courses WHERE id=%s AND schedule_id IN (SELECT id FROM schedules WHERE user_id=%s)",
+            """SELECT c.*,s.variant_type FROM courses c JOIN schedules s ON s.id=c.schedule_id
+               WHERE c.id=%s AND s.user_id=%s""",
             (course_id, user["id"]),
         ).fetchone()
         if not old_course:
             raise HTTPException(404, "课程不存在")
+        reject_original_schedule(old_course)
 
         row = db.execute(
             """UPDATE courses SET schedule_id=%s,name=%s,teacher=%s,room=%s,
@@ -166,7 +177,7 @@ def delete_course(course_id: int, user=Depends(get_current_user)):
     with connect() as db:
         deleted = db.execute(
             """DELETE FROM courses WHERE id=%s
-            AND schedule_id IN (SELECT id FROM schedules WHERE user_id=%s) RETURNING id""",
+            AND schedule_id IN (SELECT id FROM schedules WHERE user_id=%s AND variant_type<>'original') RETURNING id""",
             (course_id, user["id"]),
         ).fetchone()
         if not deleted:
@@ -188,12 +199,15 @@ def upsert_adjustment(
         raise HTTPException(400, "结束节次不能早于开始节次")
     with connect() as db:
         course = db.execute(
-            """SELECT c.* FROM courses c JOIN schedules s ON s.id=c.schedule_id
+            """SELECT c.*,s.variant_type FROM courses c JOIN schedules s ON s.id=c.schedule_id
                WHERE c.id=%s AND s.user_id=%s""",
             (course_id, user["id"]),
         ).fetchone()
         if not course:
             raise HTTPException(404, "课程不存在")
+        reject_original_schedule(course)
+        if course["weeks"] and week not in course["weeks"]:
+            raise HTTPException(400, "该课程在指定周次没有排课")
         if adjustment_conflicts(db, course_id, week, payload.weekday, payload.start_section, payload.end_section):
             raise HTTPException(409, "目标时段与现有课程冲突")
         row = db.execute(

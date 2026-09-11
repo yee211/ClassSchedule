@@ -53,8 +53,11 @@ def get_current_user(credentials: HTTPAuthorizationCredentials = Depends(_bearer
         raise HTTPException(401, "未登录")
     try:
         payload = jwt.decode(credentials.credentials, JWT_SECRET, algorithms=[JWT_ALGORITHM])
+        user_id = int(payload["sub"])
+        if user_id <= 0:
+            raise ValueError("invalid user id")
     except jwt.ExpiredSignatureError:
         raise HTTPException(401, "登录已过期，请重新登录")
-    except jwt.InvalidTokenError:
+    except (jwt.InvalidTokenError, KeyError, TypeError, ValueError):
         raise HTTPException(401, "无效的登录凭证")
-    return {"id": int(payload["sub"]), "username": payload.get("username", "")}
+    return {"id": user_id, "username": payload.get("username", "")}

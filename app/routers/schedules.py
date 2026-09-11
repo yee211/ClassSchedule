@@ -1,7 +1,8 @@
+import json
 from datetime import date
 
 from fastapi import APIRouter, Depends, HTTPException
-from pydantic import BaseModel
+from pydantic import BaseModel, Field, field_validator
 
 from ..auth import get_current_user
 from ..db import connect, row_dict
@@ -10,10 +11,25 @@ router = APIRouter(prefix="/api/schedules", tags=["schedules"])
 
 
 class ScheduleUpdate(BaseModel):
-    name: str | None = None
-    term: str | None = None
+    name: str | None = Field(default=None, max_length=80)
+    term: str | None = Field(default=None, max_length=80)
     start_date: str | None = None
     end_date: str | None = None
+
+    @field_validator("name")
+    @classmethod
+    def clean_name(cls, value):
+        if value is None:
+            return None
+        value = value.strip()
+        if not value:
+            raise ValueError("课表名称不能为空")
+        return value
+
+    @field_validator("term")
+    @classmethod
+    def clean_term(cls, value):
+        return value.strip() if value is not None else None
 
 
 def parse_schedule_date(value: str | None, label: str):
@@ -26,6 +42,59 @@ def parse_schedule_date(value: str | None, label: str):
         return date.fromisoformat(value)
     except ValueError as error:
         raise HTTPException(400, f"{label}格式应为 YYYY-MM-DD") from error
+
+
+@router.post("/{schedule_id}/adjusted", status_code=201)
+def ensure_adjusted_schedule(schedule_id: int, user=Depends(get_current_user)):
+    """为导入课表创建唯一的可编辑副本；重复调用返回同一副本。"""
+    with connect() as db:
+        db.execute("SELECT pg_advisory_xact_lock(%s)", (schedule_id,))
+        source = db.execute(
+            "SELECT * FROM schedules WHERE id=%s AND user_id=%s FOR UPDATE",
+            (schedule_id, user["id"]),
+        ).fetchone()
+        if not source:
+            raise HTTPException(404, "课表不存在")
+        if source["variant_type"] != "original":
+            return {"schedule_id": source["id"], "created": False, "course_map": {}}
+
+        adjusted = db.execute(
+            "SELECT * FROM schedules WHERE source_schedule_id=%s AND variant_type='adjusted'",
+            (source["id"],),
+        ).fetchone()
+        created = adjusted is None
+        if not adjusted:
+            adjusted = db.execute(
+                """INSERT INTO schedules
+                   (user_id,name,term,start_date,end_date,background,variant_type,source_schedule_id)
+                   VALUES(%s,%s,%s,%s,%s,%s,'adjusted',%s) RETURNING *""",
+                (
+                    user["id"], source["name"], f"{source['term']}（调）", source["start_date"],
+                    source["end_date"], source["background"], source["id"],
+                ),
+            ).fetchone()
+            courses = db.execute("SELECT * FROM courses WHERE schedule_id=%s ORDER BY id", (source["id"],)).fetchall()
+            for course in courses:
+                db.execute(
+                    """INSERT INTO courses
+                       (schedule_id,name,teacher,room,weekday,start_section,end_section,weeks,color,source_course_id)
+                       VALUES(%s,%s,%s,%s,%s,%s,%s,%s::jsonb,%s,%s)""",
+                    (
+                        adjusted["id"], course["name"], course["teacher"], course["room"], course["weekday"],
+                        course["start_section"], course["end_section"], json.dumps(course["weeks"]),
+                        course["color"], course["id"],
+                    ),
+                )
+
+        mapped = db.execute(
+            "SELECT id,source_course_id FROM courses WHERE schedule_id=%s AND source_course_id IS NOT NULL",
+            (adjusted["id"],),
+        ).fetchall()
+        return {
+            "schedule_id": adjusted["id"],
+            "created": created,
+            "course_map": {str(row["source_course_id"]): row["id"] for row in mapped},
+        }
 
 
 @router.get("")
@@ -100,7 +169,20 @@ def update_schedule(schedule_id: int, payload: ScheduleUpdate, user=Depends(get_
         ).fetchall()
 
         result = row_dict(updated)
-        result["courses"] = [row_dict(c) for c in courses_rows]
+        course_ids = [course["id"] for course in courses_rows]
+        adjustments_by_course = {course_id: [] for course_id in course_ids}
+        if course_ids:
+            adjustment_rows = db.execute(
+                "SELECT * FROM course_adjustments WHERE course_id = ANY(%s) ORDER BY week",
+                (course_ids,),
+            ).fetchall()
+            for adjustment in adjustment_rows:
+                adjustments_by_course[adjustment["course_id"]].append(row_dict(adjustment))
+        result["courses"] = []
+        for course in courses_rows:
+            item = row_dict(course)
+            item["adjustments"] = adjustments_by_course.get(course["id"], [])
+            result["courses"].append(item)
         return result
 
 
@@ -108,6 +190,14 @@ def update_schedule(schedule_id: int, payload: ScheduleUpdate, user=Depends(get_
 def delete_schedule(schedule_id: int, user=Depends(get_current_user)):
     """删除指定的课表，级联删除下属所有课程。"""
     with connect() as db:
+        source = db.execute(
+            "SELECT variant_type FROM schedules WHERE id=%s AND user_id=%s",
+            (schedule_id, user["id"]),
+        ).fetchone()
+        if source and source["variant_type"] == "original" and db.execute(
+            "SELECT 1 FROM schedules WHERE source_schedule_id=%s", (schedule_id,)
+        ).fetchone():
+            raise HTTPException(409, "请先删除该学期的调课版，再删除原始课表")
         if not db.execute(
             "DELETE FROM schedules WHERE id=%s AND user_id=%s RETURNING id",
             (schedule_id, user["id"]),

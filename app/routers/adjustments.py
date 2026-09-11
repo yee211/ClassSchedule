@@ -98,8 +98,14 @@ def parse_notice(file: UploadFile = File(...), schedule_id: int = Form(...), use
 @router.post("/apply")
 def apply_notice(payload: ApplyRequest, user=Depends(get_current_user)):
     with connect() as db:
-        if not db.execute("SELECT 1 FROM schedules WHERE id=%s AND user_id=%s", (payload.schedule_id, user["id"])).fetchone():
+        schedule = db.execute(
+            "SELECT variant_type FROM schedules WHERE id=%s AND user_id=%s",
+            (payload.schedule_id, user["id"]),
+        ).fetchone()
+        if not schedule:
             raise HTTPException(404, "课表不存在")
+        if schedule["variant_type"] == "original":
+            raise HTTPException(409, "原始导入课表为只读，请先创建调课版")
         seen = set()
         details = []
         for item in payload.items:

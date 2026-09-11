@@ -2,6 +2,7 @@ from datetime import date
 
 import pytest
 from fastapi import HTTPException
+from pydantic import ValidationError
 
 from app.routers.schedules import ScheduleUpdate, parse_schedule_date
 
@@ -26,3 +27,9 @@ def test_schedule_update_schema():
     )
     assert payload.name == "新课表"
     assert payload.start_date == "2026-09-07"
+
+
+def test_schedule_update_rejects_blank_name_and_cleans_term():
+    with pytest.raises(ValidationError):
+        ScheduleUpdate(name="   ")
+    assert ScheduleUpdate(term="  2026 秋  ").term == "2026 秋"

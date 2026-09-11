@@ -76,20 +76,22 @@ def import_file(
         with connect() as db:
             db.execute("SELECT pg_advisory_xact_lock(hashtext(%s))", (f"{user['id']}|{parsed['term']}",))
             schedule = db.execute(
-                "SELECT * FROM schedules WHERE user_id=%s AND term=%s ORDER BY id DESC LIMIT 1 FOR UPDATE",
+                """SELECT * FROM schedules WHERE user_id=%s AND term=%s
+                   AND variant_type IN ('original','draft') ORDER BY id DESC LIMIT 1 FOR UPDATE""",
                 (user["id"], parsed["term"]),
             ).fetchone()
             replaced = schedule is not None
             if schedule:
                 schedule = db.execute(
-                    """UPDATE schedules SET name=%s,start_date=%s,end_date=%s
+                    """UPDATE schedules SET name=%s,start_date=%s,end_date=%s,variant_type='original'
                     WHERE id=%s RETURNING *""",
                     (parsed["name"], schedule_start, schedule_end, schedule["id"]),
                 ).fetchone()
                 db.execute("DELETE FROM courses WHERE schedule_id=%s", (schedule["id"],))
             else:
                 schedule = db.execute(
-                    "INSERT INTO schedules(user_id,name,term,start_date,end_date) VALUES(%s,%s,%s,%s,%s) RETURNING *",
+                    """INSERT INTO schedules(user_id,name,term,start_date,end_date,variant_type)
+                       VALUES(%s,%s,%s,%s,%s,'original') RETURNING *""",
                     (user["id"], parsed["name"], parsed["term"], schedule_start, schedule_end),
                 ).fetchone()
             rows = [(

@@ -31,7 +31,7 @@ class LoginIn(BaseModel):
 
 
 class CourseIn(BaseModel):
-    schedule_id: int
+    schedule_id: int = Field(gt=0)
     name: str = Field(min_length=1, max_length=80)
     teacher: str = Field(default="", max_length=40)
     room: str = Field(default="", max_length=40)
@@ -39,7 +39,15 @@ class CourseIn(BaseModel):
     start_section: int = Field(ge=1, le=12)
     end_section: int = Field(ge=1, le=12)
     weeks: list[int] = Field(default_factory=list)
-    color: str = "#5B8DEF"
+    color: str = Field(default="#5B8DEF", pattern=r"^#[0-9A-Fa-f]{6}$")
+
+    @field_validator("name", "teacher", "room")
+    @classmethod
+    def clean_text(cls, value, info):
+        value = value.strip()
+        if info.field_name == "name" and not value:
+            raise ValueError("课程名称不能为空")
+        return value
 
     @field_validator("weeks")
     @classmethod
@@ -55,3 +63,8 @@ class CourseAdjustmentIn(BaseModel):
     start_section: int = Field(ge=1, le=12)
     end_section: int = Field(ge=1, le=12)
     room: str = Field(default="", max_length=40)
+
+    @field_validator("room")
+    @classmethod
+    def clean_room(cls, value):
+        return value.strip()

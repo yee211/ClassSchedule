@@ -90,6 +90,8 @@ def init_db():
             background TEXT NOT NULL DEFAULT '', created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP)""")
         db.execute("ALTER TABLE schedules ADD COLUMN IF NOT EXISTS end_date DATE")
         db.execute("ALTER TABLE schedules ADD COLUMN IF NOT EXISTS user_id BIGINT REFERENCES users(id) ON DELETE CASCADE")
+        db.execute("ALTER TABLE schedules ADD COLUMN IF NOT EXISTS variant_type VARCHAR(16) NOT NULL DEFAULT 'draft'")
+        db.execute("ALTER TABLE schedules ADD COLUMN IF NOT EXISTS source_schedule_id BIGINT REFERENCES schedules(id) ON DELETE CASCADE")
         db.execute("""CREATE TABLE IF NOT EXISTS courses (
             id BIGSERIAL PRIMARY KEY,
             schedule_id BIGINT NOT NULL REFERENCES schedules(id) ON DELETE CASCADE,
@@ -105,6 +107,10 @@ def init_db():
         db.execute("ALTER TABLE schedules ALTER COLUMN user_id SET NOT NULL")
         # 索引优化：外键关联与高频查询加速
         db.execute("CREATE INDEX IF NOT EXISTS idx_courses_schedule_id ON courses(schedule_id)")
+        db.execute("ALTER TABLE courses ADD COLUMN IF NOT EXISTS source_course_id BIGINT REFERENCES courses(id) ON DELETE SET NULL")
+        db.execute("CREATE INDEX IF NOT EXISTS idx_courses_source_course_id ON courses(source_course_id)")
+        db.execute("""CREATE UNIQUE INDEX IF NOT EXISTS uq_schedules_adjusted_source
+            ON schedules(source_schedule_id) WHERE variant_type='adjusted'""")
         db.execute("""CREATE TABLE IF NOT EXISTS course_adjustments (
             id BIGSERIAL PRIMARY KEY,
             course_id BIGINT NOT NULL REFERENCES courses(id) ON DELETE CASCADE,

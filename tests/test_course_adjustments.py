@@ -1,7 +1,7 @@
 import pytest
 from pydantic import ValidationError
 
-from app.schemas import CourseAdjustmentIn
+from app.schemas import CourseAdjustmentIn, CourseIn
 
 
 def test_course_adjustment_schema():
@@ -26,3 +26,17 @@ def test_course_adjustment_rejects_out_of_range(field, value):
     data[field] = value
     with pytest.raises(ValidationError):
         CourseAdjustmentIn(**data)
+
+
+def test_course_input_cleans_text_and_validates_color():
+    course = CourseIn(
+        schedule_id=1, name="  高等数学  ", teacher=" 张老师 ", room=" 教101 ",
+        weekday=1, start_section=1, end_section=2, weeks=[2, 1, 2], color="#A1b2C3",
+    )
+    assert (course.name, course.teacher, course.room) == ("高等数学", "张老师", "教101")
+    assert course.weeks == [1, 2]
+
+    with pytest.raises(ValidationError):
+        CourseIn(schedule_id=1, name="   ", weekday=1, start_section=1, end_section=2)
+    with pytest.raises(ValidationError):
+        CourseIn(schedule_id=1, name="课程", weekday=1, start_section=1, end_section=2, color="red")

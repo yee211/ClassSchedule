@@ -285,6 +285,23 @@ async function load(preferredId = null) {
   }
 }
 
+// 导入课表保持只读；第一次实际修改时创建并切换到唯一的“（调）”副本。
+async function ensureEditableSchedule(courseId = null) {
+  if (!schedule.value || schedule.value.variant_type !== 'original') {
+    return { scheduleId: schedule.value?.id, courseId, courseMap: {} };
+  }
+  const previousWeek = week.value;
+  const result = await schedulesApi.ensureAdjusted(schedule.value.id);
+  await load(result.schedule_id);
+  week.value = Math.min(previousWeek, scheduleWeekCount(schedule.value));
+  if (result.created) notify('已保留原始课表，并创建“（调）”版本');
+  return {
+    scheduleId: result.schedule_id,
+    courseId: courseId == null ? null : (result.course_map?.[String(courseId)] || courseId),
+    courseMap: result.course_map || {},
+  };
+}
+
 // 切换当前课表
 function selectSchedule(payload) {
   const targetId = typeof payload === 'object' && payload?.target ? Number(payload.target.value) : Number(payload);
@@ -380,10 +397,11 @@ async function saveAdjustment() {
     return;
   }
   try {
-    await coursesApi.adjust(adjustmentCourse.value.id, week.value, payload);
+    const editable = await ensureEditableSchedule(adjustmentCourse.value.id);
+    await coursesApi.adjust(editable.courseId, week.value, payload);
     adjustmentOpen.value = false;
     notify(`第 ${week.value} 周调课已保存`);
-    await load(schedule.value.id);
+    await load(editable.scheduleId);
   } catch (error) {
     notify(error.message);
   }
@@ -452,15 +470,16 @@ async function applyAdjustmentNotice() {
   if (!selected.length) return;
   adjustmentImportApplying.value = true;
   try {
+    const editable = await ensureEditableSchedule();
     const items = selected.map(item => ({
-      course_id: item.course_id,
+      course_id: editable.courseMap?.[String(item.course_id)] || item.course_id,
       week: item.week,
       weekday: item.new_weekday,
       start_section: item.new_start_section,
       end_section: item.new_end_section,
       room: item.new_room,
     }));
-    const result = await adjustmentsApi.apply(schedule.value.id, items);
+    const result = await adjustmentsApi.apply(editable.scheduleId, items);
     adjustmentImportOpen.value = false;
     notify(`已应用 ${result.applied} 条调课`);
     await load(schedule.value.id);
@@ -482,6 +501,8 @@ async function saveCourseMove(scope) {
   if (!move) return;
   moveSaving.value = true;
   try {
+    const editable = await ensureEditableSchedule(move.course.id);
+    const effectiveCourseId = editable.courseId;
     const orig = move.course.original_course || move.course;
     if (scope === 'week') {
       // If moved back to original unadjusted position, cancel adjustment instead of creating redundant adjustment
@@ -490,7 +511,7 @@ async function saveCourseMove(scope) {
           && orig.end_section === move.end_section
           && (orig.room || '') === (move.course.room || '')) {
         if (move.course.adjusted_week) {
-          await coursesApi.cancelAdjustment(move.course.id, week.value);
+          await coursesApi.cancelAdjustment(effectiveCourseId, week.value);
           notify(`已移回第 ${week.value} 周原位置，自动取消调课`);
           moveModalOpen.value = false;
           await load(schedule.value.id);
@@ -498,7 +519,7 @@ async function saveCourseMove(scope) {
           return;
         }
       }
-      await coursesApi.adjust(move.course.id, week.value, {
+      await coursesApi.adjust(effectiveCourseId, week.value, {
         week: week.value,
         weekday: move.weekday,
         start_section: move.start_section,
@@ -507,8 +528,8 @@ async function saveCourseMove(scope) {
       });
     } else {
       const base = move.course.original_course || move.course;
-      await coursesApi.update(base.id, {
-        schedule_id: schedule.value.id,
+      await coursesApi.update(effectiveCourseId, {
+        schedule_id: editable.scheduleId,
         name: base.name,
         teacher: base.teacher || '',
         room: base.room || '',
@@ -520,7 +541,7 @@ async function saveCourseMove(scope) {
       }, 'drag');
       if (move.course.adjusted_week) {
         try {
-          await coursesApi.cancelAdjustment(base.id, move.course.adjusted_week);
+          await coursesApi.cancelAdjustment(effectiveCourseId, move.course.adjusted_week);
         } catch (_) {}
       }
     }
@@ -562,11 +583,13 @@ async function saveCourse() {
     return;
   }
   try {
+    const editable = await ensureEditableSchedule(form.id || null);
+    payload.schedule_id = editable.scheduleId;
     if (form.id) {
-      await coursesApi.update(form.id, payload, 'manual');
+      await coursesApi.update(editable.courseId, payload, 'manual');
       if (editingAdjustedWeek.value) {
         try {
-          await coursesApi.cancelAdjustment(form.id, editingAdjustedWeek.value);
+          await coursesApi.cancelAdjustment(editable.courseId, editingAdjustedWeek.value);
         } catch (_) {}
         editingAdjustedWeek.value = null;
       }
@@ -649,7 +672,8 @@ async function restoreCourseRecord(record) {
     const recordWeek = record.week || (Array.isArray(record.details) ? record.details[0]?.week : null);
 
     // If single-week move or adjustment
-    if (record.action_type === 'drag_move' || (record.action_type === 'manual_edit' && recordWeek)) {
+    // drag_move 同时用于整学期移动和单周调课；只有日志明确携带 week 才按单周恢复。
+    if (recordWeek) {
       const w = recordWeek || week.value;
       // If target matches original unadjusted course, cancel adjustment completely
       if (targetWeekday === orig.weekday && targetStart === orig.start_section && targetEnd === orig.end_section && targetRoom === (orig.room || '')) {
@@ -712,7 +736,8 @@ async function removeCourse() {
   });
   if (!ok) return;
   try {
-    await coursesApi.delete(form.id);
+    const editable = await ensureEditableSchedule(form.id);
+    await coursesApi.delete(editable.courseId);
     editorOpen.value = false;
     notify('课程已删除');
     await load();
