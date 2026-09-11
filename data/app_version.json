@@ -1,15 +1,16 @@
 {
-  "versionCode": 14,
-  "versionName": "2.2.4",
+  "versionCode": 15,
+  "versionName": "2.2.5",
   "minVersionCode": 1,
-  "title": "发现新版本 v2.2.4",
+  "title": "发现新版本 v2.2.5",
   "changelog": [
-    "单课修改记录与一键撤销",
-    "记录左滑删除与快捷删除",
-    "拖拽移动弹窗简化（默认调整本周）",
-    "全局调课中心精简（专注于调课通知）"
+    "课表拖拽底层优化，彻底解决多次拖动变卡与卡死问题",
+    "移回原位自动清除调字，新增删除调字一键恢复按钮",
+    "修改记录支持撤销修改与删除记录双按钮",
+    "修改记录独立向下滑动查看，消除弹窗挤压",
+    "点击较早记录一键链式回滚至该修改发生前状态"
   ],
-  "downloadUrl": "https://gh-proxy.com/https://raw.githubusercontent.com/yee211/ClassSchedule/main/static/downloads/%E5%BA%8F%E6%97%B6_v2.2.4.apk",
-  "backupDownloadUrl": "https://api.tanzeng.xyz/downloads/%E5%BA%8F%E6%97%B6_v2.2.4.apk",
+  "downloadUrl": "https://gh-proxy.com/https://raw.githubusercontent.com/yee211/ClassSchedule/main/static/downloads/%E5%BA%8F%E6%97%B6_v2.2.5.apk",
+  "backupDownloadUrl": "https://api.tanzeng.xyz/downloads/%E5%BA%8F%E6%97%B6_v2.2.5.apk",
   "forceUpdate": false
 }

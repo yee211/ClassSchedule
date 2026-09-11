@@ -1115,7 +1115,7 @@ html[data-bg="night"] .user-menu-link:hover { background: rgba(255, 255, 255, 0.
   border-radius: 999px;
   padding: 1px 7px;
 }
-.swipe-hint {
+.history-hint {
   font-size: 0.72rem;
   color: #94a3b8;
 }
@@ -1123,9 +1123,18 @@ html[data-bg="night"] .user-menu-link:hover { background: rgba(255, 255, 255, 0.
   display: flex;
   flex-direction: column;
   gap: 8px;
-  max-height: 180px;
+  max-height: 220px;
   overflow-y: auto;
-  padding-right: 2px;
+  padding-right: 4px;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(148, 163, 184, 0.4) transparent;
+}
+.course-history-list::-webkit-scrollbar {
+  width: 5px;
+}
+.course-history-list::-webkit-scrollbar-thumb {
+  background: rgba(148, 163, 184, 0.4);
+  border-radius: 4px;
 }
 .history-swipe-wrapper {
   border-radius: 12px;
@@ -1136,6 +1145,11 @@ html[data-bg="night"] .user-menu-link:hover { background: rgba(255, 255, 255, 0.
   border-radius: 12px;
   background: rgba(255, 255, 255, 0.78);
   box-shadow: 0 2px 6px rgba(15, 23, 42, 0.04);
+}
+html[data-bg="night"] .course-history-card {
+  background: rgba(30, 41, 59, 0.75);
+  border-color: rgba(148, 163, 184, 0.25);
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.3);
 }
 .history-card-head {
   display: flex;
@@ -1149,9 +1163,45 @@ html[data-bg="night"] .user-menu-link:hover { background: rgba(255, 255, 255, 0.
   gap: 4px;
 }
 .history-card-actions {
-  margin-top: 6px;
+  margin-top: 8px;
   display: flex;
   justify-content: flex-end;
+  gap: 8px;
+}
+.delete-record-btn {
+  border: 1px solid rgba(239, 68, 68, 0.25);
+  background: rgba(239, 68, 68, 0.08);
+  color: #ef4444;
+  padding: 4px 10px;
+  border-radius: 8px;
+  font-size: 0.78rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+.delete-record-btn:hover {
+  background: rgba(239, 68, 68, 0.18);
+  border-color: rgba(239, 68, 68, 0.4);
+  transform: translateY(-1px);
+}
+.danger-outline.uiverse-button {
+  border: 1px solid rgba(239, 68, 68, 0.45) !important;
+  color: #e11d48 !important;
+  background: rgba(254, 226, 226, 0.45) !important;
+}
+.danger-outline.uiverse-button:hover {
+  background: rgba(254, 226, 226, 0.8) !important;
+  border-color: rgba(239, 68, 68, 0.65) !important;
+  transform: translateY(-1px);
+}
+html[data-bg="night"] .danger-outline.uiverse-button {
+  background: rgba(239, 68, 68, 0.15) !important;
+  border-color: rgba(239, 68, 68, 0.4) !important;
+  color: #f87171 !important;
+}
+html[data-bg="night"] .danger-outline.uiverse-button:hover {
+  background: rgba(239, 68, 68, 0.25) !important;
+  border-color: rgba(239, 68, 68, 0.6) !important;
 }
 .history-time {
   font-size: 0.72rem;

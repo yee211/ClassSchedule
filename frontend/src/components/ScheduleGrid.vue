@@ -96,38 +96,17 @@ function courseStyle(course) {
     gridRow: `${course.start_section + 1}/${course.start_section + span + 1}`,
     '--course': props.colorMap.get(courseKey(course.name)) || '#5B8DEF',
     '--max-lines': span * 4,
-    ...(isDragging ? { transform: `translate3d(${drag.dx}px, ${drag.dy}px, 0) scale(1.04)` } : {}),
+    ...(isDragging ? {
+      transform: `translate3d(${drag.dx}px, ${drag.dy}px, 0) scale(1.04)`,
+      zIndex: 99,
+      willChange: 'transform',
+    } : {}),
   };
 }
 
-function activateDrag(element) {
-  drag.pending = false;
-  drag.active = true;
-  drag.dx = 0;
-  drag.dy = 0;
-  suppressClick = true;
-  element?.setPointerCapture?.(drag.pointerId);
-}
+let cachedMetrics = null;
 
-function beginDrag(event, course) {
-  if (drag.active || drag.pending || drag.settling) return;
-  if (event.button !== undefined && event.button !== 0) return;
-  drag.course = course;
-  drag.pointerId = event.pointerId;
-  drag.pointerType = event.pointerType || 'mouse';
-  dragElement = event.currentTarget;
-  drag.x = event.clientX;
-  drag.y = event.clientY;
-  drag.weekday = course.weekday;
-  drag.start = course.start_section;
-  drag.dx = 0;
-  drag.dy = 0;
-  drag.settling = false;
-  drag.pending = true;
-  if (drag.pointerType === 'touch') holdTimer = window.setTimeout(() => activateDrag(dragElement), 400);
-}
-
-function gridMetrics() {
+function computeGridMetrics() {
   const grid = gridRef.value;
   if (!grid) return null;
   const rect = grid.getBoundingClientRect();
@@ -145,9 +124,9 @@ function gridMetrics() {
 }
 
 function updateDragTarget(clientX, clientY) {
-  const metrics = gridMetrics();
-  if (!metrics || !drag.course) return;
-  const { rect, leftWidth, headerHeight, dayWidth, rowHeight } = metrics;
+  if (!cachedMetrics) cachedMetrics = computeGridMetrics();
+  if (!cachedMetrics || !drag.course) return;
+  const { rect, leftWidth, headerHeight, dayWidth, rowHeight } = cachedMetrics;
   const duration = drag.course.end_section - drag.course.start_section + 1;
   drag.weekday = Math.max(1, Math.min(7, Math.floor((clientX - rect.left - leftWidth) / dayWidth) + 1));
   drag.start = Math.max(1, Math.min(maxSections.value - duration + 1, Math.floor((clientY - rect.top - headerHeight) / rowHeight) + 1));
@@ -155,27 +134,63 @@ function updateDragTarget(clientX, clientY) {
   drag.dy = clientY - drag.y;
 }
 
-function continueDrag(event) {
+function activateDrag(element) {
+  drag.pending = false;
+  drag.active = true;
+  drag.dx = 0;
+  drag.dy = 0;
+  suppressClick = true;
+  cachedMetrics = computeGridMetrics();
+  try {
+    element?.setPointerCapture?.(drag.pointerId);
+  } catch (_) {}
+}
+
+function onWindowPointerMove(event) {
   if (drag.pointerId !== event.pointerId || (!drag.pending && !drag.active)) return;
   if (drag.pending) {
     const distance = Math.hypot(event.clientX - drag.x, event.clientY - drag.y);
     if (drag.pointerType !== 'touch' && distance > 4) {
       activateDrag(dragElement);
-      event.preventDefault();
+      if (event.cancelable) event.preventDefault();
       updateDragTarget(event.clientX, event.clientY);
-    } else if (drag.pointerType === 'touch' && distance > 8) {
+    } else if (drag.pointerType === 'touch' && distance > 10) {
       window.clearTimeout(holdTimer);
-      drag.pending = false;
+      resetDrag();
     }
     return;
   }
   if (drag.active) {
-    event.preventDefault();
+    if (event.cancelable) event.preventDefault();
     updateDragTarget(event.clientX, event.clientY);
   }
 }
 
+function onWindowPointerUp(event) {
+  if (drag.pointerId !== event.pointerId) return;
+  finishDrag(event, false);
+}
+
+function onWindowPointerCancel(event) {
+  if (drag.pointerId !== event.pointerId) return;
+  finishDrag(event, true);
+}
+
+function removeWindowListeners() {
+  window.removeEventListener('pointermove', onWindowPointerMove);
+  window.removeEventListener('pointerup', onWindowPointerUp);
+  window.removeEventListener('pointercancel', onWindowPointerCancel);
+}
+
 function resetDrag() {
+  removeWindowListeners();
+  window.clearTimeout(holdTimer);
+  window.clearTimeout(settleTimer);
+  if (dragElement && drag.pointerId != null) {
+    try {
+      dragElement.releasePointerCapture(drag.pointerId);
+    } catch (_) {}
+  }
   drag.active = false;
   drag.pending = false;
   drag.settling = false;
@@ -184,11 +199,39 @@ function resetDrag() {
   drag.dx = 0;
   drag.dy = 0;
   dragElement = null;
-  window.setTimeout(() => { suppressClick = false; }, 0);
+  cachedMetrics = null;
+  window.setTimeout(() => { suppressClick = false; }, 50);
+}
+
+function beginDrag(event, course) {
+  if (event.button !== undefined && event.button !== 0) return;
+  if (drag.active || drag.pending || drag.settling) {
+    resetDrag();
+  }
+  drag.course = course;
+  drag.pointerId = event.pointerId;
+  drag.pointerType = event.pointerType || 'mouse';
+  dragElement = event.currentTarget;
+  drag.x = event.clientX;
+  drag.y = event.clientY;
+  drag.weekday = course.weekday;
+  drag.start = course.start_section;
+  drag.dx = 0;
+  drag.dy = 0;
+  drag.settling = false;
+  drag.pending = true;
+  cachedMetrics = computeGridMetrics();
+
+  window.addEventListener('pointermove', onWindowPointerMove, { passive: false });
+  window.addEventListener('pointerup', onWindowPointerUp);
+  window.addEventListener('pointercancel', onWindowPointerCancel);
+
+  if (drag.pointerType === 'touch') {
+    holdTimer = window.setTimeout(() => activateDrag(dragElement), 350);
+  }
 }
 
 function finishDrag(event, cancelled = false) {
-  if (drag.pointerId !== event.pointerId) return;
   window.clearTimeout(holdTimer);
   if (drag.active && drag.course) {
     const sourceCourse = drag.course;
@@ -201,23 +244,17 @@ function finishDrag(event, cancelled = false) {
       && targetStart <= course.end_section && end >= course.start_section);
     const changed = targetWeekday !== sourceCourse.weekday || targetStart !== sourceCourse.start_section;
     const shouldMove = !cancelled && !conflict && changed;
-    const metrics = gridMetrics();
-    drag.dx = shouldMove && metrics ? (targetWeekday - sourceCourse.weekday) * metrics.dayWidth : 0;
-    drag.dy = shouldMove && metrics ? (targetStart - sourceCourse.start_section) * metrics.rowHeight : 0;
-    drag.active = false;
-    drag.settling = true;
-    window.clearTimeout(settleTimer);
-    settleTimer = window.setTimeout(() => {
-      if (!cancelled && conflict) emit('move-conflict');
-      else if (shouldMove) emit('move-course', {
+
+    if (!cancelled && conflict) {
+      emit('move-conflict');
+    } else if (shouldMove) {
+      emit('move-course', {
         course: sourceCourse,
         weekday: targetWeekday,
         start_section: targetStart,
         end_section: end,
       });
-      resetDrag();
-    }, 180);
-    return;
+    }
   }
   resetDrag();
 }
@@ -227,8 +264,7 @@ function openCourse(course) {
 }
 
 onUnmounted(() => {
-  window.clearTimeout(holdTimer);
-  window.clearTimeout(settleTimer);
+  resetDrag();
 });
 </script>
 
@@ -273,9 +309,6 @@ onUnmounted(() => {
         :style="courseStyle(course)"
         @click="openCourse(course)"
         @pointerdown="beginDrag($event, course)"
-        @pointermove="continueDrag"
-        @pointerup="finishDrag"
-        @pointercancel="finishDrag($event, true)"
         @contextmenu.prevent
       >
         <span class="course-text">

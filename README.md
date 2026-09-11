@@ -8,7 +8,7 @@
 [![Vite](https://img.shields.io/badge/Vite-6.x-646CFF.svg?style=flat-square&logo=vite)](https://vitejs.dev)
 [![Capacitor](https://img.shields.io/badge/Capacitor-Android-119EFF.svg?style=flat-square&logo=capacitor)](https://capacitorjs.com)
 [![PostgreSQL](https://img.shields.io/badge/PostgreSQL-17-4169E1.svg?style=flat-square&logo=postgresql)](https://www.postgresql.org)
-[![Release](https://img.shields.io/badge/Release-v2.2.4-brightgreen.svg?style=flat-square)](https://github.com/yee211/ClassSchedule/releases)
+[![Release](https://img.shields.io/badge/Release-v2.2.5-brightgreen.svg?style=flat-square)](https://github.com/yee211/ClassSchedule/releases)
 [![License](https://img.shields.io/badge/License-MIT-blue.svg?style=flat-square)](#开源协议)
 
 ---
@@ -18,8 +18,8 @@
 | 平台 / 通道 | 访问 / 下载方式 | 说明 |
 | :--- | :--- | :--- |
 | 🌐 **Web 网页版** | [https://api.tanzeng.xyz](https://api.tanzeng.xyz) | 任意现代浏览器秒开，全端自适应，免安装直接体验 |
-| 📱 **Android 客户端 (v2.2.4)** | [🚀 Cloudflare 全球 CDN 极速下载](https://gh-proxy.com/https://raw.githubusercontent.com/yee211/ClassSchedule/main/static/downloads/%E5%BA%8F%E6%97%B6_v2.2.4.apk) | **推荐**，极速 CDN 加速，下载文件名保存为 `序时_v2.2.4.apk` |
-| 📱 **Android 客户端备用** | [🔗 官方服务器直链下载](https://api.tanzeng.xyz/downloads/%E5%BA%8F%E6%97%B6_v2.2.4.apk) | 官方源站直链通道 |
+| 📱 **Android 客户端 (v2.2.5)** | [🚀 Cloudflare 全球 CDN 极速下载](https://gh-proxy.com/https://raw.githubusercontent.com/yee211/ClassSchedule/main/static/downloads/%E5%BA%8F%E6%97%B6_v2.2.5.apk) | **推荐**，极速 CDN 加速，下载文件名保存为 `序时_v2.2.5.apk` |
+| 📱 **Android 客户端备用** | [🔗 官方服务器直链下载](https://api.tanzeng.xyz/downloads/%E5%BA%8F%E6%97%B6_v2.2.5.apk) | 官方源站直链通道 |
 | 📱 **Android 永久最新直链** | [⚡ 序时.apk 永久最新版](https://api.tanzeng.xyz/downloads/%E5%BA%8F%E6%97%B6.apk) | 始终指向最新稳定构建版 |
 
 ---

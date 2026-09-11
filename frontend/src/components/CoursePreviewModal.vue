@@ -1,5 +1,5 @@
 <script setup>
-import { ref, watch, computed } from 'vue';
+import { computed } from 'vue';
 import {
   courseKey,
   days,
@@ -14,17 +14,7 @@ const props = defineProps({
   records: { type: Array, default: () => [] },
 });
 
-const emit = defineEmits(['close', 'edit', 'adjust', 'restore', 'revoke', 'delete']);
-
-const swipedId = ref(null);
-let touchStartX = 0;
-let touchStartY = 0;
-
-watch(() => props.open, val => {
-  if (val) {
-    swipedId.value = null;
-  }
-});
+const emit = defineEmits(['close', 'edit', 'adjust', 'restore', 'revoke', 'delete', 'remove-adjustment']);
 
 const courseHexColor = computed(() => {
   if (!props.course) return '#5B8DEF';
@@ -81,28 +71,7 @@ function canRevokeRecord(rec) {
 }
 
 function handleRevoke(rec) {
-  if (rec.can_revoke && rec.details?.[0]?.week) {
-    emit('revoke', rec.details[0]);
-  } else if (rec.course_id) {
-    emit('restore', rec);
-  }
-}
-
-function onTouchStart(id, event) {
-  touchStartX = event.touches[0].clientX;
-  touchStartY = event.touches[0].clientY;
-}
-
-function onTouchEnd(id, event) {
-  const diffX = event.changedTouches[0].clientX - touchStartX;
-  const diffY = event.changedTouches[0].clientY - touchStartY;
-  if (Math.abs(diffX) > Math.abs(diffY) && Math.abs(diffX) > 35) {
-    if (diffX < 0) {
-      swipedId.value = id;
-    } else if (swipedId.value === id) {
-      swipedId.value = null;
-    }
-  }
+  emit('restore', rec);
 }
 </script>
 
@@ -141,77 +110,68 @@ function onTouchEnd(id, event) {
             <b>修改记录</b>
             <span class="history-count">{{ records.length }}</span>
           </div>
-          <small class="swipe-hint">左滑可删除记录</small>
+          <small class="history-hint">向下滑动可查看全部</small>
         </div>
 
         <div class="course-history-list">
-          <div
+          <article
             v-for="rec in records"
             :key="rec.id"
-            class="swipe-card-wrapper history-swipe-wrapper"
-            @touchstart="onTouchStart(rec.id, $event)"
-            @touchend="onTouchEnd(rec.id, $event)"
+            class="course-history-card"
+            :class="`type-${rec.action_type}`"
           >
-            <!-- Background Swipe-Delete Button -->
-            <button
-              type="button"
-              class="swipe-delete-btn"
-              title="左滑删除记录"
-              @click.stop="emit('delete', rec)"
-            >
-              <span>删除</span>
-            </button>
+            <div class="history-card-head">
+              <span class="badge-tag" :class="`tag-${rec.action_type}`">
+                {{ rec.action_type === 'drag_move' ? '位置移动' : rec.action_type === 'manual_edit' ? '主动编辑' : '调课通知' }}
+              </span>
+              <span class="change-log-time">{{ formatTime(rec.created_at) }}</span>
+            </div>
 
-            <!-- Foreground Card -->
-            <article
-              class="course-history-card swipe-card-front"
-              :class="{ 'is-swiped': swipedId === rec.id, [`type-${rec.action_type}`]: true }"
-              @click="swipedId === rec.id ? (swipedId = null) : null"
-            >
-              <div class="history-card-head">
-                <span class="badge-tag" :class="`tag-${rec.action_type}`">
-                  {{ rec.action_type === 'drag_move' ? '位置移动' : rec.action_type === 'manual_edit' ? '主动编辑' : '调课通知' }}
+            <div class="history-card-body">
+              <div class="change-log-desc">{{ rec.description }}</div>
+
+              <!-- Diff Chips -->
+              <div v-if="getRecordDiffs(rec).length" class="edit-diff-list">
+                <span v-for="(diff, di) in getRecordDiffs(rec)" :key="di" class="diff-tag">
+                  {{ diff.label }}: {{ diff.old }} → {{ diff.new }}
                 </span>
-                <div class="head-right-actions">
-                  <span class="change-log-time">{{ formatTime(rec.created_at) }}</span>
-                  <button
-                    type="button"
-                    class="desktop-delete-btn"
-                    title="删除此记录"
-                    @click.stop="emit('delete', rec)"
-                  >
-                    ×
-                  </button>
-                </div>
               </div>
 
-              <div class="history-card-body">
-                <div class="change-log-desc">{{ rec.description }}</div>
-
-                <!-- Diff Chips -->
-                <div v-if="getRecordDiffs(rec).length" class="edit-diff-list">
-                  <span v-for="(diff, di) in getRecordDiffs(rec)" :key="di" class="diff-tag">
-                    {{ diff.label }}: {{ diff.old }} → {{ diff.new }}
-                  </span>
-                </div>
-
-                <!-- Revoke Action -->
-                <div v-if="canRevokeRecord(rec)" class="history-card-actions">
-                  <button
-                    type="button"
-                    class="revoke-action-btn"
-                    @click.stop="handleRevoke(rec)"
-                  >
-                    撤销修改
-                  </button>
-                </div>
+              <!-- Dual Actions: 撤销修改 & 删除记录 -->
+              <div class="history-card-actions">
+                <button
+                  v-if="canRevokeRecord(rec)"
+                  type="button"
+                  class="revoke-action-btn"
+                  title="回滚到该次修改发生前的状态"
+                  @click.stop="handleRevoke(rec)"
+                >
+                  撤销修改
+                </button>
+                <button
+                  type="button"
+                  class="delete-record-btn"
+                  title="删除此条记录"
+                  @click.stop="emit('delete', rec)"
+                >
+                  删除记录
+                </button>
               </div>
-            </article>
-          </div>
+            </div>
+          </article>
         </div>
       </div>
 
       <div class="modal-actions">
+        <button
+          v-if="course?.adjusted_week"
+          class="danger-outline uiverse-button"
+          type="button"
+          title="清除当前周的调课，恢复至原课表排课"
+          @click="emit('remove-adjustment', course)"
+        >
+          删除“调”字
+        </button>
         <span></span>
         <button class="uiverse-button" type="button" @click="emit('close')">关闭</button>
         <button class="uiverse-button" type="button" @click="emit('adjust', course)">

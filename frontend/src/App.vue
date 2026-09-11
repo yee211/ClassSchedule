@@ -433,7 +433,22 @@ async function saveCourseMove(scope) {
   if (!move) return;
   moveSaving.value = true;
   try {
+    const orig = move.course.original_course || move.course;
     if (scope === 'week') {
+      // If moved back to original unadjusted position, cancel adjustment instead of creating redundant adjustment
+      if (orig.weekday === move.weekday
+          && orig.start_section === move.start_section
+          && orig.end_section === move.end_section
+          && (orig.room || '') === (move.course.room || '')) {
+        if (move.course.adjusted_week) {
+          await coursesApi.cancelAdjustment(move.course.id, week.value);
+          notify(`已移回第 ${week.value} 周原位置，自动清除“调”字`);
+          moveModalOpen.value = false;
+          await load(schedule.value.id);
+          await loadChangeLogs();
+          return;
+        }
+      }
       await coursesApi.adjust(move.course.id, week.value, {
         week: week.value,
         weekday: move.weekday,
@@ -529,6 +544,23 @@ async function deleteChangeLog(record) {
   }
 }
 
+async function removeCourseAdjustment(course) {
+  if (!course?.adjusted_week) return;
+  if (!confirm(`确认清除《${course.name}》第 ${course.adjusted_week} 周的调课标记，恢复原排课？`)) return;
+  try {
+    await coursesApi.cancelAdjustment(course.id, course.adjusted_week);
+    notify('已清除“调”字标记，恢复原时间');
+    await load(schedule.value.id);
+    await loadChangeLogs();
+    if (previewCourse.value && previewCourse.value.id === course.id) {
+      const refreshed = (schedule.value?.courses || []).find(c => c.id === course.id);
+      if (refreshed) previewCourse.value = refreshed;
+    }
+  } catch (error) {
+    notify(error.message);
+  }
+}
+
 async function restoreCourseRecord(record) {
   if (!record.course_id) return;
   const course = (schedule.value?.courses || []).find(c => c.id === record.course_id);
@@ -542,21 +574,59 @@ async function restoreCourseRecord(record) {
     notify('未找到可恢复的变更项');
     return;
   }
-  if (!confirm(`确认将《${course.name}》撤销改动，恢复至改动前状态？`)) return;
+  if (!confirm(`确认撤销改动，将《${course.name}》直接回滚至此记录修改前的状态？`)) return;
   try {
-    const payload = {
-      schedule_id: schedule.value.id,
-      name: course.name,
-      teacher: course.teacher || '',
-      room: roomDiff && roomDiff.old !== '未设置' ? roomDiff.old : course.room || '',
-      weekday: timeDiff?.old_weekday ? timeDiff.old_weekday : course.weekday,
-      start_section: timeDiff?.old_start_section ? timeDiff.old_start_section : course.start_section,
-      end_section: timeDiff?.old_end_section ? timeDiff.old_end_section : course.end_section,
-      weeks: course.weeks || [],
-      color: course.color,
-    };
-    await coursesApi.update(course.id, payload, 'manual');
-    notify('课程改动已撤销恢复');
+    const orig = course.original_course || course;
+    const targetWeekday = timeDiff?.old_weekday ? timeDiff.old_weekday : orig.weekday;
+    const targetStart = timeDiff?.old_start_section ? timeDiff.old_start_section : orig.start_section;
+    const targetEnd = timeDiff?.old_end_section ? timeDiff.old_end_section : orig.end_section;
+    const targetRoom = roomDiff && roomDiff.old !== '未设置' ? roomDiff.old : (course.room || orig.room || '');
+
+    const recordWeek = record.week || (Array.isArray(record.details) ? record.details[0]?.week : null);
+
+    // If single-week move or adjustment
+    if (record.action_type === 'drag_move' || (record.action_type === 'manual_edit' && recordWeek)) {
+      const w = recordWeek || week.value;
+      // If target matches original unadjusted course, cancel adjustment completely
+      if (targetWeekday === orig.weekday && targetStart === orig.start_section && targetEnd === orig.end_section && targetRoom === (orig.room || '')) {
+        await coursesApi.cancelAdjustment(course.id, w);
+      } else {
+        await coursesApi.adjust(course.id, w, {
+          week: w,
+          weekday: targetWeekday,
+          start_section: targetStart,
+          end_section: targetEnd,
+          room: targetRoom,
+        });
+      }
+    } else {
+      // All-weeks course update
+      const payload = {
+        schedule_id: schedule.value.id,
+        name: course.name,
+        teacher: course.teacher || '',
+        room: targetRoom,
+        weekday: targetWeekday,
+        start_section: targetStart,
+        end_section: targetEnd,
+        weeks: orig.weeks || course.weeks || [],
+        color: course.color,
+      };
+      await coursesApi.update(course.id, payload, 'manual');
+    }
+
+    // Clean up this record and all subsequent records for this course (chain rollback)
+    const subsequentLogs = (changeLogs.value || []).filter(l => {
+      const cid = l.course_id || (Array.isArray(l.details) ? l.details[0]?.course_id : null);
+      return cid === course.id && l.id >= record.id;
+    });
+    for (const sub of subsequentLogs) {
+      try {
+        await adjustmentsApi.deleteRecord(sub.id);
+      } catch (_) {}
+    }
+
+    notify('已成功撤销并回滚至该次修改前的状态');
     await load(schedule.value.id);
     await loadChangeLogs();
     if (previewCourse.value && previewCourse.value.id === course.id) {
@@ -814,6 +884,7 @@ onUnmounted(() => {
     @restore="restoreCourseRecord"
     @revoke="revokeAdjustmentRecord"
     @delete="deleteChangeLog"
+    @remove-adjustment="removeCourseAdjustment"
   />
 
   <!-- 课程编辑 / 新建模态弹窗 -->
