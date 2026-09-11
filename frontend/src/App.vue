@@ -94,6 +94,16 @@ const adjustmentCenterOpen = ref(false);
 const changeLogs = ref([]);
 const changeLogsLoading = ref(false);
 
+const previewCourseLogs = computed(() => {
+  if (!previewCourse.value?.id) return [];
+  const cid = previewCourse.value.id;
+  return changeLogs.value.filter(log => {
+    if (log.course_id === cid) return true;
+    if (Array.isArray(log.details) && log.details.some(d => d.course_id === cid)) return true;
+    return false;
+  });
+});
+
 const importerOpen = ref(false);
 const importing = ref(false);
 const importSetup = ref(false);
@@ -303,7 +313,7 @@ function openPreview(course) {
 
 function editPreview(course) {
   previewOpen.value = false;
-  openEditor(course.original_course || course);
+  openEditor(course);
 }
 
 function openAdjustment(course) {
@@ -379,6 +389,10 @@ async function revokeAdjustmentRecord(record) {
     notify('调课记录已撤销');
     await load(schedule.value.id);
     await loadChangeLogs();
+    if (previewCourse.value && previewCourse.value.id === record.course_id) {
+      const refreshed = (schedule.value?.courses || []).find(c => c.id === record.course_id);
+      if (refreshed) previewCourse.value = refreshed;
+    }
   } catch (error) {
     notify(error.message);
   }
@@ -440,6 +454,11 @@ async function saveCourseMove(scope) {
         weeks: base.weeks || [],
         color: base.color,
       }, 'drag');
+      if (move.course.adjusted_week) {
+        try {
+          await coursesApi.cancelAdjustment(base.id, move.course.adjusted_week);
+        } catch (_) {}
+      }
     }
     moveModalOpen.value = false;
     notify(scope === 'week' ? `第 ${week.value} 周课程已调整` : '整学期课程时间已修改');
@@ -452,7 +471,10 @@ async function saveCourseMove(scope) {
   }
 }
 
+const editingAdjustedWeek = ref(null);
+
 function openEditor(course) {
+  editingAdjustedWeek.value = course?.adjusted_week || null;
   Object.assign(form, emptyCourse(), course || {});
   form.weeks = formatWeeks(course?.weeks) || '1-16';
   editorOpen.value = true;
@@ -478,6 +500,12 @@ async function saveCourse() {
   try {
     if (form.id) {
       await coursesApi.update(form.id, payload, 'manual');
+      if (editingAdjustedWeek.value) {
+        try {
+          await coursesApi.cancelAdjustment(form.id, editingAdjustedWeek.value);
+        } catch (_) {}
+        editingAdjustedWeek.value = null;
+      }
     } else {
       await coursesApi.add(payload);
     }
@@ -485,6 +513,56 @@ async function saveCourse() {
     notify('课程已保存');
     await load();
     await loadChangeLogs();
+  } catch (error) {
+    notify(error.message);
+  }
+}
+
+async function deleteChangeLog(record) {
+  if (!confirm(`确认删除此条变更记录？`)) return;
+  try {
+    await adjustmentsApi.deleteRecord(record.id);
+    notify('记录已删除');
+    await loadChangeLogs();
+  } catch (error) {
+    notify(error.message);
+  }
+}
+
+async function restoreCourseRecord(record) {
+  if (!record.course_id) return;
+  const course = (schedule.value?.courses || []).find(c => c.id === record.course_id);
+  if (!course) {
+    notify('原课程已不存在');
+    return;
+  }
+  const timeDiff = Array.isArray(record.details) ? record.details.find(d => d.field === 'time') : null;
+  const roomDiff = Array.isArray(record.details) ? record.details.find(d => d.field === 'room') : null;
+  if (!timeDiff && !roomDiff) {
+    notify('未找到可恢复的变更项');
+    return;
+  }
+  if (!confirm(`确认将《${course.name}》撤销改动，恢复至改动前状态？`)) return;
+  try {
+    const payload = {
+      schedule_id: schedule.value.id,
+      name: course.name,
+      teacher: course.teacher || '',
+      room: roomDiff && roomDiff.old !== '未设置' ? roomDiff.old : course.room || '',
+      weekday: timeDiff?.old_weekday ? timeDiff.old_weekday : course.weekday,
+      start_section: timeDiff?.old_start_section ? timeDiff.old_start_section : course.start_section,
+      end_section: timeDiff?.old_end_section ? timeDiff.old_end_section : course.end_section,
+      weeks: course.weeks || [],
+      color: course.color,
+    };
+    await coursesApi.update(course.id, payload, 'manual');
+    notify('课程改动已撤销恢复');
+    await load(schedule.value.id);
+    await loadChangeLogs();
+    if (previewCourse.value && previewCourse.value.id === course.id) {
+      const refreshed = (schedule.value?.courses || []).find(c => c.id === course.id);
+      if (refreshed) previewCourse.value = refreshed;
+    }
   } catch (error) {
     notify(error.message);
   }
@@ -729,9 +807,13 @@ onUnmounted(() => {
     :open="previewOpen"
     :course="previewCourse"
     :color-map="courseColorMap"
+    :records="previewCourseLogs"
     @close="previewOpen = false"
     @edit="editPreview"
     @adjust="openAdjustment"
+    @restore="restoreCourseRecord"
+    @revoke="revokeAdjustmentRecord"
+    @delete="deleteChangeLog"
   />
 
   <!-- 课程编辑 / 新建模态弹窗 -->
@@ -772,6 +854,8 @@ onUnmounted(() => {
     @close="adjustmentCenterOpen = false"
     @image="uploadAdjustmentNotice"
     @revoke="revokeAdjustmentRecord"
+    @restore="restoreCourseRecord"
+    @delete="deleteChangeLog"
   />
 
   <CourseMoveModal
@@ -781,7 +865,6 @@ onUnmounted(() => {
     :saving="moveSaving"
     @close="moveModalOpen = false"
     @save-week="saveCourseMove('week')"
-    @save-all="saveCourseMove('all')"
   />
 
   <!-- 课表导入向导模态弹窗 -->

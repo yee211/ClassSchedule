@@ -106,6 +106,12 @@ def update_course(course_id: int, course: CourseIn, source: str = "manual", user
                 "label": "上课时间",
                 "old": f"{DAYS_NAMES[old_course['weekday']-1]} 第{old_course['start_section']}-{old_course['end_section']}节",
                 "new": f"{DAYS_NAMES[course.weekday-1]} 第{course.start_section}-{course.end_section}节",
+                "old_weekday": old_course["weekday"],
+                "old_start_section": old_course["start_section"],
+                "old_end_section": old_course["end_section"],
+                "new_weekday": course.weekday,
+                "new_start_section": course.start_section,
+                "new_end_section": course.end_section,
             })
         if (old_course["room"] or "") != (course.room or ""):
             diffs.append({
@@ -201,8 +207,15 @@ def upsert_adjustment(
             (course_id, week, payload.weekday, payload.start_section, payload.end_section, payload.room),
         ).fetchone()
 
+        old_time = f"{DAYS_NAMES[course['weekday']-1]} 第{course['start_section']}-{course['end_section']}节"
+        new_time = f"{DAYS_NAMES[payload.weekday-1]} 第{payload.start_section}-{payload.end_section}节"
+
         diffs = [
             {
+                "field": "time",
+                "label": "上课时间",
+                "old": old_time,
+                "new": new_time,
                 "course_id": course_id,
                 "course_name": course["name"],
                 "week": week,
@@ -216,10 +229,15 @@ def upsert_adjustment(
                 "new_room": payload.room or "",
             }
         ]
+        if payload.room and payload.room != course["room"]:
+            diffs.append({
+                "field": "room",
+                "label": "教室地点",
+                "old": course["room"] or "未设置",
+                "new": payload.room or "未设置",
+            })
         action_type = "drag_move" if source == "drag" else "manual_edit"
-        title = "位置移动（修改时间）" if source == "drag" else "临时调课"
-        old_time = f"{DAYS_NAMES[course['weekday']-1]} 第{course['start_section']}-{course['end_section']}节"
-        new_time = f"{DAYS_NAMES[payload.weekday-1]} 第{payload.start_section}-{payload.end_section}节"
+        title = "位置移动（修改时间）" if source == "drag" else "主动编辑（单周调课）"
         desc = f"第 {week} 周将《{course['name']}》从 {old_time} 调整至 {new_time}"
         if payload.room and payload.room != course["room"]:
             desc += f"（教室：{payload.room}）"

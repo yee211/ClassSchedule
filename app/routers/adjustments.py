@@ -181,3 +181,17 @@ def list_records(schedule_id: int, user=Depends(get_current_user)):
             item["can_revoke"] = any(isinstance(sub, dict) and sub.get("can_revoke") for sub in details)
             results.append(item)
         return results
+
+
+@router.delete("/records/{record_id}", status_code=204)
+def delete_record(record_id: int, user=Depends(get_current_user)):
+    """删除指定的调课或课程修改历史记录。"""
+    with connect() as db:
+        row = db.execute(
+            """DELETE FROM course_change_logs
+               WHERE id=%s AND schedule_id IN (SELECT id FROM schedules WHERE user_id=%s)
+               RETURNING id""",
+            (record_id, user["id"]),
+        ).fetchone()
+        if not row:
+            raise HTTPException(404, "记录不存在")

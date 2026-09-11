@@ -120,14 +120,30 @@ def test_course_change_logs_flow():
         assert batch_rec["details"][0]["course_name"] == "高等数学"
         assert batch_rec["details"][0]["can_revoke"] is True
 
-        # 主动编辑记录
+        # 主动编辑记录（验证上课时间和教室地点 diff 均被正确记录）
         edit_rec = next(r for r in records if r["action_type"] == "manual_edit")
         assert edit_rec["title"] == "主动编辑课程"
         assert any(d["label"] == "教室地点" for d in edit_rec["details"])
+        assert any(d["label"] == "上课时间" for d in edit_rec["details"])
 
         # 拖拽移动记录
         drag_recs = [r for r in records if r["action_type"] == "drag_move"]
         assert len(drag_recs) >= 2
+
+        # 6. 测试删除记录（左滑删除/点击删除）
+        target_rec_id = edit_rec["id"]
+        res_del = client.delete(f"/api/adjustments/records/{target_rec_id}")
+        assert res_del.status_code == 204
+
+        # 再次获取列表，已删除记录不应出现
+        res_records_after = client.get("/api/adjustments/records?schedule_id=9999")
+        assert res_records_after.status_code == 200
+        records_after_ids = [r["id"] for r in res_records_after.json()]
+        assert target_rec_id not in records_after_ids
+
+        # 删除不存在的记录返回 404
+        res_del_404 = client.delete("/api/adjustments/records/999999")
+        assert res_del_404.status_code == 404
     finally:
         app.dependency_overrides.clear()
         if _is_db_available():

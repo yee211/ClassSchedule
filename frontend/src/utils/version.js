@@ -1,8 +1,8 @@
 import { Capacitor } from '@capacitor/core';
 import { appApi } from '../api/index.js';
 
-export const CURRENT_VERSION_NAME = '2.2.3';
-export const CURRENT_VERSION_CODE = 13;
+export const CURRENT_VERSION_NAME = '2.2.4';
+export const CURRENT_VERSION_CODE = 14;
 
 // 判断当前是否运行在 Android 原生客户端环境
 export const isNativePlatform = () => Capacitor.isNativePlatform();

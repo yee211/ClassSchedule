@@ -161,6 +161,9 @@ export const adjustmentsApi = {
   async getRecords(scheduleId) {
     return api(`/api/adjustments/records?schedule_id=${encodeURIComponent(scheduleId)}`);
   },
+  async deleteRecord(recordId) {
+    return api(`/api/adjustments/records/${encodeURIComponent(recordId)}`, { method: 'DELETE' });
+  },
 };
 
 export const importerApi = {

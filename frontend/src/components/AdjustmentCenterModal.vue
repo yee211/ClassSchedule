@@ -7,17 +7,20 @@ const props = defineProps({
   records: { type: Array, default: () => [] },
   loading: { type: Boolean, default: false },
 });
-const emit = defineEmits(['close', 'image', 'revoke']);
+const emit = defineEmits(['close', 'image', 'revoke', 'restore', 'delete']);
 const mode = ref('menu');
 const selectedRecord = ref(null);
-const currentTab = ref('all');
 const imageInput = ref(null);
+const swipedId = ref(null);
+
+let touchStartX = 0;
+let touchStartY = 0;
 
 watch(() => props.open, value => {
   if (value) {
     mode.value = 'menu';
     selectedRecord.value = null;
-    currentTab.value = 'all';
+    swipedId.value = null;
   }
 });
 
@@ -44,21 +47,76 @@ function formatTime(isoStr) {
   return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}`;
 }
 
-const tabs = [
-  { id: 'all', label: '全部' },
-  { id: 'batch_import', label: '图片调课' },
-  { id: 'drag_move', label: '位置移动' },
-  { id: 'manual_edit', label: '主动编辑' },
-];
-
 const filteredRecords = computed(() => {
-  if (currentTab.value === 'all') return props.records;
-  return props.records.filter(r => r.action_type === currentTab.value);
+  return props.records.filter(r => r.action_type === 'batch_import');
 });
 
 function viewDetail(record) {
   selectedRecord.value = record;
   mode.value = 'detail';
+}
+
+function getRecordDiffs(rec) {
+  if (!Array.isArray(rec.details) || !rec.details.length) return [];
+  const diffs = [];
+  for (const item of rec.details) {
+    if (item.label && (item.old !== undefined || item.new !== undefined)) {
+      diffs.push({
+        label: item.label,
+        old: item.old,
+        new: item.new,
+      });
+    } else if (item.old_weekday || item.new_weekday) {
+      diffs.push({
+        label: '上课时间',
+        old: formatPlace(item.old_weekday, item.old_start_section, item.old_end_section),
+        new: formatPlace(item.new_weekday, item.new_start_section, item.new_end_section),
+      });
+      if (item.old_room !== item.new_room) {
+        diffs.push({
+          label: '教室地点',
+          old: item.old_room || '未设置',
+          new: item.new_room || '未设置',
+        });
+      }
+    }
+  }
+  return diffs;
+}
+
+function canRevokeRecord(rec) {
+  if (rec.can_revoke) return true;
+  if (rec.course_id && Array.isArray(rec.details) && rec.details.length > 0) {
+    return true;
+  }
+  return false;
+}
+
+function handleRevoke(rec) {
+  if (rec.can_revoke && rec.details?.[0]?.week) {
+    emit('revoke', rec.details[0]);
+  } else if (rec.action_type === 'batch_import') {
+    viewDetail(rec);
+  } else if (rec.course_id) {
+    emit('restore', rec);
+  }
+}
+
+function onTouchStart(id, event) {
+  touchStartX = event.touches[0].clientX;
+  touchStartY = event.touches[0].clientY;
+}
+
+function onTouchEnd(id, event) {
+  const diffX = event.changedTouches[0].clientX - touchStartX;
+  const diffY = event.changedTouches[0].clientY - touchStartY;
+  if (Math.abs(diffX) > Math.abs(diffY) && Math.abs(diffX) > 35) {
+    if (diffX < 0) {
+      swipedId.value = id;
+    } else if (swipedId.value === id) {
+      swipedId.value = null;
+    }
+  }
 }
 </script>
 
@@ -68,7 +126,7 @@ function viewDetail(record) {
       <div class="modal-head">
         <div>
           <p>课程变更</p>
-          <h2>{{ mode === 'menu' ? '调课中心' : mode === 'detail' ? '调课详情' : '调课与修改记录' }}</h2>
+          <h2>{{ mode === 'menu' ? '调课中心' : mode === 'detail' ? '调课详情' : '调课通知记录' }}</h2>
         </div>
         <button type="button" class="icon" :disabled="loading" @click="emit('close')">×</button>
       </div>
@@ -79,7 +137,7 @@ function viewDetail(record) {
           <span>▣</span><b>课程图片识别调课</b><small>上传学校调课通知截图自动识别</small>
         </button>
         <button type="button" class="adjustment-entry" @click="mode = 'records'">
-          <span>≡</span><b>调课与修改记录</b><small>查看调课通知、拖拽移动与编辑记录</small>
+          <span>≡</span><b>调课通知记录</b><small>查看学校调课通知与批量调整详情</small>
         </button>
         <input ref="imageInput" class="sr-only" type="file" accept="image/jpeg,image/png,image/webp" @change="onImage">
       </div>
@@ -142,64 +200,81 @@ function viewDetail(record) {
 
       <!-- Records Mode -->
       <div v-else class="adjustment-records-container">
-        <div class="records-filter-tabs">
-          <button
-            v-for="t in tabs"
-            :key="t.id"
-            type="button"
-            class="filter-tab-btn"
-            :class="{ active: currentTab === t.id }"
-            @click="currentTab = t.id"
-          >
-            {{ t.label }}
-          </button>
-        </div>
-
         <div class="adjustment-records-list">
-          <p v-if="!filteredRecords.length" class="empty-records">当前分类下暂无记录</p>
-          <article
+          <p v-if="!filteredRecords.length" class="empty-records">暂无调课通知记录</p>
+          <div
             v-for="rec in filteredRecords"
             :key="rec.id"
-            class="change-log-item"
-            :class="`type-${rec.action_type}`"
+            class="swipe-card-wrapper"
+            @touchstart="onTouchStart(rec.id, $event)"
+            @touchend="onTouchEnd(rec.id, $event)"
           >
-            <div class="change-log-head">
-              <span class="badge-tag" :class="`tag-${rec.action_type}`">
-                {{ rec.action_type === 'batch_import' ? '图片调课' : rec.action_type === 'drag_move' ? '位置移动' : '主动编辑' }}
-              </span>
-              <span class="change-log-time">{{ formatTime(rec.created_at) }}</span>
-            </div>
+            <!-- Background Swipe-Delete Button -->
+            <button
+              type="button"
+              class="swipe-delete-btn"
+              title="左滑删除记录"
+              @click.stop="emit('delete', rec)"
+            >
+              <span>删除</span>
+            </button>
 
-            <div class="change-log-body">
-              <div class="change-log-title">{{ rec.title }}</div>
-              <div class="change-log-desc">{{ rec.description }}</div>
-
-              <!-- Batch Import Details Action -->
-              <div v-if="rec.action_type === 'batch_import'" class="change-log-actions">
-                <button type="button" class="view-detail-btn" @click="viewDetail(rec)">
-                  查看详情（{{ rec.details?.length || 0 }} 门次） →
-                </button>
-              </div>
-
-              <!-- Drag move with single-week adjustment can_revoke -->
-              <div v-else-if="rec.action_type === 'drag_move' && rec.can_revoke && rec.details && rec.details[0]" class="change-log-actions">
-                <button
-                  type="button"
-                  class="danger-link"
-                  @click="emit('revoke', rec.details[0])"
-                >
-                  撤销移动
-                </button>
-              </div>
-
-              <!-- Manual edit details diff badges -->
-              <div v-else-if="rec.action_type === 'manual_edit' && Array.isArray(rec.details)" class="edit-diff-list">
-                <span v-for="(diff, di) in rec.details" :key="di" class="diff-tag">
-                  {{ diff.label }}: {{ diff.old }} → {{ diff.new }}
+            <!-- Foreground Card -->
+            <article
+              class="change-log-item swipe-card-front"
+              :class="{ 'is-swiped': swipedId === rec.id, [`type-${rec.action_type}`]: true }"
+              @click="swipedId === rec.id ? (swipedId = null) : null"
+            >
+              <div class="change-log-head">
+                <span class="badge-tag" :class="`tag-${rec.action_type}`">
+                  {{ rec.action_type === 'batch_import' ? '图片调课' : rec.action_type === 'drag_move' ? '位置移动' : '主动编辑' }}
                 </span>
+                <div class="head-right-actions">
+                  <span class="change-log-time">{{ formatTime(rec.created_at) }}</span>
+                  <button
+                    type="button"
+                    class="desktop-delete-btn"
+                    title="删除此记录"
+                    @click.stop="emit('delete', rec)"
+                  >
+                    ×
+                  </button>
+                </div>
               </div>
-            </div>
-          </article>
+
+              <div class="change-log-body">
+                <div class="change-log-title">{{ rec.title }}</div>
+                <div class="change-log-desc">{{ rec.description }}</div>
+
+                <!-- Diff Chips: Render both time and room changes -->
+                <div v-if="getRecordDiffs(rec).length" class="edit-diff-list">
+                  <span v-for="(diff, di) in getRecordDiffs(rec)" :key="di" class="diff-tag">
+                    {{ diff.label }}: {{ diff.old }} → {{ diff.new }}
+                  </span>
+                </div>
+
+                <!-- Actions: Detail View & Revoke -->
+                <div class="change-log-actions">
+                  <button
+                    v-if="rec.action_type === 'batch_import'"
+                    type="button"
+                    class="view-detail-btn"
+                    @click="viewDetail(rec)"
+                  >
+                    查看详情（{{ rec.details?.length || 0 }} 门次） →
+                  </button>
+                  <button
+                    v-if="canRevokeRecord(rec)"
+                    type="button"
+                    class="revoke-action-btn"
+                    @click="handleRevoke(rec)"
+                  >
+                    撤销改动
+                  </button>
+                </div>
+              </div>
+            </article>
+          </div>
         </div>
 
         <div class="modal-actions">
