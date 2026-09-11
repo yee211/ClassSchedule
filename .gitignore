@@ -43,4 +43,6 @@ yarn-error.log*
 .vscode/
 .DS_Store
 Thumbs.db
-.agents/
+.agents/*
+!.agents/skills/
+
