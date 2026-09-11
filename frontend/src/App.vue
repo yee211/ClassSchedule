@@ -1,5 +1,5 @@
 <script setup>
-import { computed, onMounted, onUnmounted, reactive, ref } from 'vue';
+import { computed, onMounted, onUnmounted, reactive, ref, watch } from 'vue';
 import {
   adjustmentsApi,
   authApi,
@@ -91,7 +91,8 @@ const moveModalOpen = ref(false);
 const pendingMove = ref(null);
 const moveSaving = ref(false);
 const adjustmentCenterOpen = ref(false);
-const adjustmentTextLoading = ref(false);
+const changeLogs = ref([]);
+const changeLogsLoading = ref(false);
 
 const importerOpen = ref(false);
 const importing = ref(false);
@@ -113,17 +114,31 @@ const weekOptions = computed(() =>
 );
 
 const courseColorMap = computed(() => buildCourseColorMap(schedule.value?.courses));
-const adjustmentRecords = computed(() => (schedule.value?.courses || []).flatMap(course =>
-  (course.adjustments || []).map(item => ({
-    ...item,
-    course_id: course.id,
-    course_name: course.name,
-    old_weekday: course.weekday,
-    old_start_section: course.start_section,
-    old_end_section: course.end_section,
-    old_room: course.room || '',
-  }))
-).sort((a, b) => a.week - b.week || a.weekday - b.weekday || a.start_section - b.start_section));
+
+async function loadChangeLogs() {
+  if (!schedule.value?.id) {
+    changeLogs.value = [];
+    return;
+  }
+  changeLogsLoading.value = true;
+  try {
+    changeLogs.value = await adjustmentsApi.getRecords(schedule.value.id);
+  } catch (error) {
+    console.error('Failed to load change logs:', error);
+  } finally {
+    changeLogsLoading.value = false;
+  }
+}
+
+watch(() => schedule.value?.id, newId => {
+  if (newId) loadChangeLogs();
+});
+
+watch(adjustmentCenterOpen, val => {
+  if (val && schedule.value?.id) {
+    loadChangeLogs();
+  }
+});
 
 // 提示消息
 function notify(text) {
@@ -356,30 +371,14 @@ async function uploadAdjustmentNotice(file) {
   }
 }
 
-async function parseAdjustmentDescription(text) {
-  if (!schedule.value) return;
-  adjustmentTextLoading.value = true;
-  adjustmentImportError.value = '';
-  try {
-    const result = await adjustmentsApi.parseText(text, schedule.value.id);
-    adjustmentCenterOpen.value = false;
-    adjustmentImportOpen.value = true;
-    adjustmentImportFilename.value = '自然语言调课描述';
-    adjustmentImportItems.value = result.items;
-    if (!result.matched) adjustmentImportError.value = '识别成功，但没有记录能与当前课表可靠匹配';
-  } catch (error) {
-    notify(error.message);
-  } finally {
-    adjustmentTextLoading.value = false;
-  }
-}
-
 async function revokeAdjustmentRecord(record) {
-  if (!confirm(`确认撤销“${record.course_name}”第 ${record.week} 周的调课？`)) return;
+  const courseName = record.course_name || '课程';
+  if (!confirm(`确认撤销“${courseName}”第 ${record.week} 周的调课？`)) return;
   try {
     await coursesApi.cancelAdjustment(record.course_id, record.week);
     notify('调课记录已撤销');
     await load(schedule.value.id);
+    await loadChangeLogs();
   } catch (error) {
     notify(error.message);
   }
@@ -402,6 +401,7 @@ async function applyAdjustmentNotice() {
     adjustmentImportOpen.value = false;
     notify(`已应用 ${result.applied} 条调课`);
     await load(schedule.value.id);
+    await loadChangeLogs();
   } catch (error) {
     adjustmentImportError.value = error.message;
   } finally {
@@ -439,11 +439,12 @@ async function saveCourseMove(scope) {
         end_section: move.end_section,
         weeks: base.weeks || [],
         color: base.color,
-      });
+      }, 'drag');
     }
     moveModalOpen.value = false;
     notify(scope === 'week' ? `第 ${week.value} 周课程已调整` : '整学期课程时间已修改');
     await load(schedule.value.id);
+    await loadChangeLogs();
   } catch (error) {
     notify(error.message);
   } finally {
@@ -476,13 +477,14 @@ async function saveCourse() {
   }
   try {
     if (form.id) {
-      await coursesApi.update(form.id, payload);
+      await coursesApi.update(form.id, payload, 'manual');
     } else {
       await coursesApi.add(payload);
     }
     editorOpen.value = false;
     notify('课程已保存');
     await load();
+    await loadChangeLogs();
   } catch (error) {
     notify(error.message);
   }
@@ -496,6 +498,7 @@ async function removeCourse() {
     editorOpen.value = false;
     notify('课程已删除');
     await load();
+    await loadChangeLogs();
   } catch (error) {
     notify(error.message);
   }
@@ -764,11 +767,10 @@ onUnmounted(() => {
 
   <AdjustmentCenterModal
     :open="adjustmentCenterOpen"
-    :records="adjustmentRecords"
-    :loading="adjustmentTextLoading"
+    :records="changeLogs"
+    :loading="changeLogsLoading"
     @close="adjustmentCenterOpen = false"
     @image="uploadAdjustmentNotice"
-    @text="parseAdjustmentDescription"
     @revoke="revokeAdjustmentRecord"
   />
 

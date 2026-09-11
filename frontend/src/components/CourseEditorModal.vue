@@ -11,7 +11,7 @@ const emit = defineEmits(['close', 'save', 'delete']);
 
 <template>
   <div v-if="open" class="backdrop" @click.self="emit('close')">
-    <form class="modal" @submit.prevent="emit('save')">
+    <form class="modal course-editor-modal" @submit.prevent="emit('save')">
       <div class="modal-head">
         <div>
           <p>{{ form.id ? '调整课程' : '新建课程' }}</p>

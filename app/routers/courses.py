@@ -67,8 +67,11 @@ def add_course(course: CourseIn, user=Depends(get_current_user)):
         return row_dict(row)
 
 
+DAYS_NAMES = ["周一", "周二", "周三", "周四", "周五", "周六", "周日"]
+
+
 @router.put("/{course_id}")
-def update_course(course_id: int, course: CourseIn, user=Depends(get_current_user)):
+def update_course(course_id: int, course: CourseIn, source: str = "manual", user=Depends(get_current_user)):
     """更新指定课程信息。"""
     if course.end_section < course.start_section:
         raise HTTPException(400, "结束节次不能早于开始节次")
@@ -78,6 +81,13 @@ def update_course(course_id: int, course: CourseIn, user=Depends(get_current_use
             (course.schedule_id, user["id"]),
         ).fetchone():
             raise HTTPException(404, "课表不存在")
+        old_course = db.execute(
+            "SELECT * FROM courses WHERE id=%s AND schedule_id IN (SELECT id FROM schedules WHERE user_id=%s)",
+            (course_id, user["id"]),
+        ).fetchone()
+        if not old_course:
+            raise HTTPException(404, "课程不存在")
+
         row = db.execute(
             """UPDATE courses SET schedule_id=%s,name=%s,teacher=%s,room=%s,
             weekday=%s,start_section=%s,end_section=%s,weeks=%s::jsonb,color=%s
@@ -86,6 +96,61 @@ def update_course(course_id: int, course: CourseIn, user=Depends(get_current_use
         ).fetchone()
         if not row:
             raise HTTPException(404, "课程不存在")
+
+        diffs = []
+        if (old_course["weekday"] != course.weekday or
+            old_course["start_section"] != course.start_section or
+            old_course["end_section"] != course.end_section):
+            diffs.append({
+                "field": "time",
+                "label": "上课时间",
+                "old": f"{DAYS_NAMES[old_course['weekday']-1]} 第{old_course['start_section']}-{old_course['end_section']}节",
+                "new": f"{DAYS_NAMES[course.weekday-1]} 第{course.start_section}-{course.end_section}节",
+            })
+        if (old_course["room"] or "") != (course.room or ""):
+            diffs.append({
+                "field": "room",
+                "label": "教室地点",
+                "old": old_course["room"] or "未设置",
+                "new": course.room or "未设置",
+            })
+        if (old_course["teacher"] or "") != (course.teacher or ""):
+            diffs.append({
+                "field": "teacher",
+                "label": "授课教师",
+                "old": old_course["teacher"] or "未设置",
+                "new": course.teacher or "未设置",
+            })
+        if old_course["name"] != course.name:
+            diffs.append({
+                "field": "name",
+                "label": "课程名称",
+                "old": old_course["name"],
+                "new": course.name,
+            })
+
+        if diffs:
+            if source == "drag":
+                action_type = "drag_move"
+                title = "位置移动（修改时间）"
+                description = f"拖拽将《{course.name}》移动至 {DAYS_NAMES[course.weekday-1]} 第{course.start_section}-{course.end_section}节（所有周次）"
+            else:
+                action_type = "manual_edit"
+                title = "主动编辑课程"
+                description = f"修改了《{course.name}》的" + "、".join(d["label"] for d in diffs)
+            db.execute(
+                """INSERT INTO course_change_logs(schedule_id, course_id, action_type, title, description, details)
+                   VALUES(%s, %s, %s, %s, %s, %s::jsonb)""",
+                (
+                    course.schedule_id,
+                    course_id,
+                    action_type,
+                    title,
+                    description,
+                    json.dumps(diffs, ensure_ascii=False),
+                ),
+            )
+
         return row_dict(row)
 
 
@@ -107,6 +172,7 @@ def upsert_adjustment(
     course_id: int,
     week: int,
     payload: CourseAdjustmentIn,
+    source: str = "drag",
     user=Depends(get_current_user),
 ):
     """新增或更新某门课程在指定周的临时调课安排。"""
@@ -115,11 +181,12 @@ def upsert_adjustment(
     if payload.end_section < payload.start_section:
         raise HTTPException(400, "结束节次不能早于开始节次")
     with connect() as db:
-        if not db.execute(
-            """SELECT 1 FROM courses c JOIN schedules s ON s.id=c.schedule_id
+        course = db.execute(
+            """SELECT c.* FROM courses c JOIN schedules s ON s.id=c.schedule_id
                WHERE c.id=%s AND s.user_id=%s""",
             (course_id, user["id"]),
-        ).fetchone():
+        ).fetchone()
+        if not course:
             raise HTTPException(404, "课程不存在")
         if adjustment_conflicts(db, course_id, week, payload.weekday, payload.start_section, payload.end_section):
             raise HTTPException(409, "目标时段与现有课程冲突")
@@ -133,6 +200,43 @@ def upsert_adjustment(
                RETURNING *""",
             (course_id, week, payload.weekday, payload.start_section, payload.end_section, payload.room),
         ).fetchone()
+
+        diffs = [
+            {
+                "course_id": course_id,
+                "course_name": course["name"],
+                "week": week,
+                "old_weekday": course["weekday"],
+                "old_start_section": course["start_section"],
+                "old_end_section": course["end_section"],
+                "old_room": course["room"] or "",
+                "new_weekday": payload.weekday,
+                "new_start_section": payload.start_section,
+                "new_end_section": payload.end_section,
+                "new_room": payload.room or "",
+            }
+        ]
+        action_type = "drag_move" if source == "drag" else "manual_edit"
+        title = "位置移动（修改时间）" if source == "drag" else "临时调课"
+        old_time = f"{DAYS_NAMES[course['weekday']-1]} 第{course['start_section']}-{course['end_section']}节"
+        new_time = f"{DAYS_NAMES[payload.weekday-1]} 第{payload.start_section}-{payload.end_section}节"
+        desc = f"第 {week} 周将《{course['name']}》从 {old_time} 调整至 {new_time}"
+        if payload.room and payload.room != course["room"]:
+            desc += f"（教室：{payload.room}）"
+
+        db.execute(
+            """INSERT INTO course_change_logs(schedule_id, course_id, action_type, title, description, details)
+               VALUES(%s, %s, %s, %s, %s, %s::jsonb)""",
+            (
+                course["schedule_id"],
+                course_id,
+                action_type,
+                title,
+                desc,
+                json.dumps(diffs, ensure_ascii=False),
+            ),
+        )
+
         return row_dict(row)
 
 

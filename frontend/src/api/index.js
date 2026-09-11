@@ -118,8 +118,9 @@ export const coursesApi = {
       body: JSON.stringify(data),
     });
   },
-  async update(id, data) {
-    return api(`/api/courses/${id}`, {
+  async update(id, data, source = 'manual') {
+    const query = source ? `?source=${encodeURIComponent(source)}` : '';
+    return api(`/api/courses/${id}${query}`, {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(data),
@@ -150,23 +151,15 @@ export const adjustmentsApi = {
       : undefined;
     return api('/api/adjustments/parse', { method: 'POST', body: form, signal });
   },
-  async parseText(text, scheduleId) {
-    const signal = typeof AbortSignal !== 'undefined' && AbortSignal.timeout
-      ? AbortSignal.timeout(30000)
-      : undefined;
-    return api('/api/adjustments/parse-text', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ schedule_id: scheduleId, text }),
-      signal,
-    });
-  },
   async apply(scheduleId, items) {
     return api('/api/adjustments/apply', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ schedule_id: scheduleId, items }),
     });
+  },
+  async getRecords(scheduleId) {
+    return api(`/api/adjustments/records?schedule_id=${encodeURIComponent(scheduleId)}`);
   },
 };
 

@@ -117,6 +117,17 @@ def init_db():
             UNIQUE (course_id, week),
             CHECK (end_section >= start_section))""")
         db.execute("CREATE INDEX IF NOT EXISTS idx_course_adjustments_course_id ON course_adjustments(course_id)")
+        db.execute("""CREATE TABLE IF NOT EXISTS course_change_logs (
+            id BIGSERIAL PRIMARY KEY,
+            schedule_id BIGINT NOT NULL REFERENCES schedules(id) ON DELETE CASCADE,
+            course_id BIGINT REFERENCES courses(id) ON DELETE SET NULL,
+            action_type VARCHAR(32) NOT NULL,
+            title VARCHAR(120) NOT NULL,
+            description TEXT NOT NULL DEFAULT '',
+            details JSONB NOT NULL DEFAULT '[]'::jsonb,
+            created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP)""")
+        db.execute("CREATE INDEX IF NOT EXISTS idx_course_change_logs_schedule_id ON course_change_logs(schedule_id)")
+        db.execute("CREATE INDEX IF NOT EXISTS idx_course_change_logs_created_at ON course_change_logs(created_at DESC)")
         db.execute("CREATE INDEX IF NOT EXISTS idx_schedules_user_id ON schedules(user_id)")
         db.execute("CREATE INDEX IF NOT EXISTS idx_schedules_user_id_term ON schedules(user_id, term)")
 

@@ -1,11 +1,12 @@
+import json
 import re
 
 from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile
 from pydantic import BaseModel, Field
 
-from ..adjustment_ai import parse_adjustment_image, parse_adjustment_text
+from ..adjustment_ai import parse_adjustment_image
 from ..auth import get_current_user
-from ..db import connect
+from ..db import connect, row_dict
 from ..settings import settings
 from .courses import adjustment_conflicts
 
@@ -62,11 +63,6 @@ class ApplyRequest(BaseModel):
     items: list[ApplyItem] = Field(min_length=1, max_length=100)
 
 
-class TextParseRequest(BaseModel):
-    schedule_id: int
-    text: str = Field(min_length=5, max_length=4000)
-
-
 def match_extracted(schedule_id: int, user_id: int, extracted: list[dict]):
     with connect() as db:
         if not db.execute("SELECT 1 FROM schedules WHERE id=%s AND user_id=%s", (schedule_id, user_id)).fetchone():
@@ -99,21 +95,13 @@ def parse_notice(file: UploadFile = File(...), schedule_id: int = Form(...), use
     return match_extracted(schedule_id, user["id"], extracted)
 
 
-@router.post("/parse-text")
-def parse_text_notice(payload: TextParseRequest, user=Depends(get_current_user)):
-    try:
-        extracted = parse_adjustment_text(payload.text.strip())
-    except RuntimeError as error:
-        raise HTTPException(422, str(error)) from error
-    return match_extracted(payload.schedule_id, user["id"], extracted)
-
-
 @router.post("/apply")
 def apply_notice(payload: ApplyRequest, user=Depends(get_current_user)):
     with connect() as db:
         if not db.execute("SELECT 1 FROM schedules WHERE id=%s AND user_id=%s", (payload.schedule_id, user["id"])).fetchone():
             raise HTTPException(404, "课表不存在")
         seen = set()
+        details = []
         for item in payload.items:
             key = (item.course_id, item.week)
             if key in seen:
@@ -131,4 +119,65 @@ def apply_notice(payload: ApplyRequest, user=Depends(get_current_user)):
                 weekday=EXCLUDED.weekday,start_section=EXCLUDED.start_section,
                 end_section=EXCLUDED.end_section,room=EXCLUDED.room""",
                 (item.course_id, item.week, item.weekday, item.start_section, item.end_section, item.room))
+            details.append({
+                "course_id": item.course_id,
+                "course_name": course["name"],
+                "week": item.week,
+                "old_weekday": course["weekday"],
+                "old_start_section": course["start_section"],
+                "old_end_section": course["end_section"],
+                "old_room": course["room"] or "",
+                "new_weekday": item.weekday,
+                "new_start_section": item.start_section,
+                "new_end_section": item.end_section,
+                "new_room": item.room or "",
+            })
+
+        if details:
+            db.execute(
+                """INSERT INTO course_change_logs(schedule_id, action_type, title, description, details)
+                   VALUES(%s, %s, %s, %s, %s::jsonb)""",
+                (
+                    payload.schedule_id,
+                    "batch_import",
+                    "图片识别调课",
+                    f"一次性调整了 {len(details)} 门次课程",
+                    json.dumps(details, ensure_ascii=False),
+                ),
+            )
     return {"applied": len(payload.items)}
+
+
+@router.get("/records")
+def list_records(schedule_id: int, user=Depends(get_current_user)):
+    """获取指定课表的调课与课程修改历史记录。"""
+    with connect() as db:
+        if not db.execute("SELECT 1 FROM schedules WHERE id=%s AND user_id=%s", (schedule_id, user["id"])).fetchone():
+            raise HTTPException(404, "课表不存在")
+        rows = db.execute(
+            """SELECT * FROM course_change_logs
+               WHERE schedule_id=%s
+               ORDER BY id DESC LIMIT 100""",
+            (schedule_id,),
+        ).fetchall()
+        active_adjustments = db.execute(
+            """SELECT ca.course_id, ca.week
+               FROM course_adjustments ca
+               JOIN courses c ON c.id=ca.course_id
+               WHERE c.schedule_id=%s""",
+            (schedule_id,),
+        ).fetchall()
+        active_keys = {(a["course_id"], a["week"]) for a in active_adjustments}
+
+        results = []
+        for row in rows:
+            item = row_dict(row)
+            details = item.get("details") or []
+            if isinstance(details, list):
+                for sub in details:
+                    if isinstance(sub, dict) and "course_id" in sub and "week" in sub:
+                        sub["can_revoke"] = (sub["course_id"], sub["week"]) in active_keys
+            item["details"] = details
+            item["can_revoke"] = any(isinstance(sub, dict) and sub.get("can_revoke") for sub in details)
+            results.append(item)
+        return results
