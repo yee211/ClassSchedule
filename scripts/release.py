@@ -494,6 +494,24 @@ def publish_github_release(
         except Exception as e:
             print(f"  [!] 上传附件 {asset_name} 失败: {e}")
 
+    # 清理 GitHub 历史版本 Release，仅保留当前最新发行版
+    try:
+        list_url = f"https://api.github.com/repos/{owner}/{repo}/releases"
+        list_req = urllib.request.Request(list_url, headers=headers)
+        with urllib.request.urlopen(list_req, timeout=30) as resp:
+            all_releases = json.loads(resp.read().decode("utf-8"))
+        for rel in all_releases:
+            if rel.get("id") != release_id:
+                del_rel_url = f"https://api.github.com/repos/{owner}/{repo}/releases/{rel['id']}"
+                del_rel_req = urllib.request.Request(del_rel_url, headers=headers, method="DELETE")
+                try:
+                    with urllib.request.urlopen(del_rel_req, timeout=30):
+                        print(f"  -> 已清理 GitHub 历史 Release: {rel.get('tag_name')}")
+                except Exception as ex:
+                    print(f"  [!] 清理历史 Release {rel.get('tag_name')} 警告: {ex}")
+    except Exception as ex:
+        print(f"  [!] 获取历史 Release 列表以执行清理时警告: {ex}")
+
     return release_data.get("html_url")
 
 
