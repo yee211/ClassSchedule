@@ -39,6 +39,7 @@ import SemesterModal from './components/SemesterModal.vue';
 import AuthModal from './components/AuthModal.vue';
 import UpdateModal from './components/UpdateModal.vue';
 import SplashScreen from './components/SplashScreen.vue';
+import ConfirmModal from './components/ConfirmModal.vue';
 import {
   CURRENT_VERSION_NAME,
   checkAppUpdate,
@@ -46,6 +47,39 @@ import {
   isNativePlatform,
   openDownloadUrl,
 } from './utils/version.js';
+
+// 通用确认模态弹窗状态（替代原生 window.confirm 浏览器弹窗）
+const confirmState = ref({
+  open: false,
+  title: '操作确认',
+  message: '',
+  confirmText: '确定',
+  cancelText: '取消',
+  danger: true,
+  resolve: null,
+});
+
+function confirmAction(message, options = {}) {
+  return new Promise(resolve => {
+    confirmState.value = {
+      open: true,
+      title: options.title || '操作确认',
+      message,
+      confirmText: options.confirmText || '确定',
+      cancelText: options.cancelText || '取消',
+      danger: options.danger ?? true,
+      resolve,
+    };
+  });
+}
+
+function handleConfirmResult(result) {
+  if (confirmState.value.resolve) {
+    confirmState.value.resolve(result);
+  }
+  confirmState.value.open = false;
+  confirmState.value.resolve = null;
+}
 
 // 检测运行环境：Android 原生 App vs 网页浏览器
 const isNative = ref(isNativePlatform());
@@ -268,7 +302,12 @@ async function deleteSchedule() {
   const current = schedule.value;
   if (!current) return;
   const title = current.term || current.name || '当前课表';
-  if (!confirm(`确认删除“${title}”？该课表中的全部课程也会被删除。`)) return;
+  const ok = await confirmAction(`确认删除“${title}”？该课表中的全部课程也会被删除。`, {
+    title: '删除课表',
+    confirmText: '删除',
+    danger: true,
+  });
+  if (!ok) return;
   try {
     await schedulesApi.delete(current.id);
     setActiveScheduleId(null);
@@ -351,7 +390,12 @@ async function saveAdjustment() {
 }
 
 async function cancelAdjustment() {
-  if (!confirm(`确认撤销第 ${week.value} 周的调课？`)) return;
+  const ok = await confirmAction(`确认撤销第 ${week.value} 周的调课？`, {
+    title: '撤销调课',
+    confirmText: '撤销',
+    danger: true,
+  });
+  if (!ok) return;
   try {
     await coursesApi.cancelAdjustment(adjustmentCourse.value.id, week.value);
     adjustmentOpen.value = false;
@@ -383,7 +427,12 @@ async function uploadAdjustmentNotice(file) {
 
 async function revokeAdjustmentRecord(record) {
   const courseName = record.course_name || '课程';
-  if (!confirm(`确认撤销“${courseName}”第 ${record.week} 周的调课？`)) return;
+  const ok = await confirmAction(`确认撤销“${courseName}”第 ${record.week} 周的调课？`, {
+    title: '撤销调课',
+    confirmText: '撤销',
+    danger: true,
+  });
+  if (!ok) return;
   try {
     await coursesApi.cancelAdjustment(record.course_id, record.week);
     notify('调课记录已撤销');
@@ -442,7 +491,7 @@ async function saveCourseMove(scope) {
           && (orig.room || '') === (move.course.room || '')) {
         if (move.course.adjusted_week) {
           await coursesApi.cancelAdjustment(move.course.id, week.value);
-          notify(`已移回第 ${week.value} 周原位置，自动清除“调”字`);
+          notify(`已移回第 ${week.value} 周原位置，自动取消调课`);
           moveModalOpen.value = false;
           await load(schedule.value.id);
           await loadChangeLogs();
@@ -534,7 +583,12 @@ async function saveCourse() {
 }
 
 async function deleteChangeLog(record) {
-  if (!confirm(`确认删除此条变更记录？`)) return;
+  const ok = await confirmAction('确认删除此条变更记录？', {
+    title: '删除记录',
+    confirmText: '删除',
+    danger: true,
+  });
+  if (!ok) return;
   try {
     await adjustmentsApi.deleteRecord(record.id);
     notify('记录已删除');
@@ -546,10 +600,15 @@ async function deleteChangeLog(record) {
 
 async function removeCourseAdjustment(course) {
   if (!course?.adjusted_week) return;
-  if (!confirm(`确认清除《${course.name}》第 ${course.adjusted_week} 周的调课标记，恢复原排课？`)) return;
+  const ok = await confirmAction(`确认取消《${course.name}》第 ${course.adjusted_week} 周的调课，恢复原排课？`, {
+    title: '取消调课',
+    confirmText: '确定取消',
+    danger: true,
+  });
+  if (!ok) return;
   try {
     await coursesApi.cancelAdjustment(course.id, course.adjusted_week);
-    notify('已清除“调”字标记，恢复原时间');
+    notify('已取消调课，恢复原时间');
     await load(schedule.value.id);
     await loadChangeLogs();
     if (previewCourse.value && previewCourse.value.id === course.id) {
@@ -574,7 +633,12 @@ async function restoreCourseRecord(record) {
     notify('未找到可恢复的变更项');
     return;
   }
-  if (!confirm(`确认撤销改动，将《${course.name}》直接回滚至此记录修改前的状态？`)) return;
+  const ok = await confirmAction(`确认撤销改动，将《${course.name}》直接回滚至此记录修改前的状态？`, {
+    title: '回滚改动',
+    confirmText: '回滚',
+    danger: true,
+  });
+  if (!ok) return;
   try {
     const orig = course.original_course || course;
     const targetWeekday = timeDiff?.old_weekday ? timeDiff.old_weekday : orig.weekday;
@@ -640,7 +704,13 @@ async function restoreCourseRecord(record) {
 
 // 删除课程
 async function removeCourse() {
-  if (!form.id || !confirm('确认删除这门课程？')) return;
+  if (!form.id) return;
+  const ok = await confirmAction('确认删除这门课程？', {
+    title: '删除课程',
+    confirmText: '删除',
+    danger: true,
+  });
+  if (!ok) return;
   try {
     await coursesApi.delete(form.id);
     editorOpen.value = false;
@@ -974,6 +1044,18 @@ onUnmounted(() => {
     @close="updateModalOpen = false"
     @ignore="onIgnoreUpdate"
     @confirm="onConfirmUpdate"
+  />
+
+  <!-- 通用确认模态弹窗（替代原生 window.confirm 浏览器弹窗） -->
+  <ConfirmModal
+    :open="confirmState.open"
+    :title="confirmState.title"
+    :message="confirmState.message"
+    :confirm-text="confirmState.confirmText"
+    :cancel-text="confirmState.cancelText"
+    :danger="confirmState.danger"
+    @confirm="handleConfirmResult(true)"
+    @cancel="handleConfirmResult(false)"
   />
 
   <Transition name="toast">

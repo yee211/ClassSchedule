@@ -167,10 +167,10 @@ function handleRevoke(rec) {
           v-if="course?.adjusted_week"
           class="danger-outline uiverse-button"
           type="button"
-          title="清除当前周的调课，恢复至原课表排课"
+          title="取消当前周的调课，恢复至原课表排课"
           @click="emit('remove-adjustment', course)"
         >
-          删除“调”字
+          取消调课
         </button>
         <span></span>
         <button class="uiverse-button" type="button" @click="emit('close')">关闭</button>

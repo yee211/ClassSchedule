@@ -127,9 +127,15 @@ function updateDragTarget(clientX, clientY) {
   if (!cachedMetrics) cachedMetrics = computeGridMetrics();
   if (!cachedMetrics || !drag.course) return;
   const { rect, leftWidth, headerHeight, dayWidth, rowHeight } = cachedMetrics;
-  const duration = drag.course.end_section - drag.course.start_section + 1;
+  const rawDuration = drag.course.end_section - drag.course.start_section + 1;
+  const duration = rawDuration <= 2 ? 2 : rawDuration;
   drag.weekday = Math.max(1, Math.min(7, Math.floor((clientX - rect.left - leftWidth) / dayWidth) + 1));
-  drag.start = Math.max(1, Math.min(maxSections.value - duration + 1, Math.floor((clientY - rect.top - headerHeight) / rowHeight) + 1));
+  const rawSection = Math.floor((clientY - rect.top - headerHeight) / rowHeight) + 1;
+  // 默认对齐 2 节制大课时 (1-2, 3-4, 5-6, 7-8, 9-10)，起始节只能是奇数 1, 3, 5, 7, 9...
+  // 严格禁止出现跨大节的 2-3, 4-5, 6-7, 8-9
+  const blockIndex = Math.floor((rawSection - 1) / 2);
+  const maxStart = 2 * Math.floor((maxSections.value - duration) / 2) + 1;
+  drag.start = Math.max(1, Math.min(maxStart, blockIndex * 2 + 1));
   drag.dx = clientX - drag.x;
   drag.dy = clientY - drag.y;
 }
@@ -215,7 +221,11 @@ function beginDrag(event, course) {
   drag.x = event.clientX;
   drag.y = event.clientY;
   drag.weekday = course.weekday;
-  drag.start = course.start_section;
+  const rawDuration = course.end_section - course.start_section + 1;
+  const duration = rawDuration <= 2 ? 2 : rawDuration;
+  const blockIndex = Math.floor((course.start_section - 1) / 2);
+  const maxStart = 2 * Math.floor((maxSections.value - duration) / 2) + 1;
+  drag.start = Math.max(1, Math.min(maxStart, blockIndex * 2 + 1));
   drag.dx = 0;
   drag.dy = 0;
   drag.settling = false;
@@ -237,12 +247,15 @@ function finishDrag(event, cancelled = false) {
     const sourceCourse = drag.course;
     const targetWeekday = drag.weekday;
     const targetStart = drag.start;
-    const duration = drag.course.end_section - drag.course.start_section + 1;
+    const rawDuration = drag.course.end_section - drag.course.start_section + 1;
+    const duration = rawDuration <= 2 ? 2 : rawDuration;
     const end = targetStart + duration - 1;
     const conflict = activeCourses.value.some(course => course.id !== sourceCourse.id
       && course.weekday === targetWeekday
       && targetStart <= course.end_section && end >= course.start_section);
-    const changed = targetWeekday !== sourceCourse.weekday || targetStart !== sourceCourse.start_section;
+    const changed = targetWeekday !== sourceCourse.weekday
+      || targetStart !== sourceCourse.start_section
+      || end !== sourceCourse.end_section;
     const shouldMove = !cancelled && !conflict && changed;
 
     if (!cancelled && conflict) {
@@ -301,6 +314,15 @@ onUnmounted(() => {
           :style="{ gridColumn: day + 1, gridRow: section + 1 }"
         ></div>
       </template>
+      <!-- 拖拽对齐落点预览 (1-2, 3-4, 5-6, 7-8, 9-10) -->
+      <div
+        v-if="drag.active && drag.course"
+        class="drag-target-slot"
+        :style="{
+          gridColumn: drag.weekday + 1,
+          gridRow: `${drag.start + 1} / ${drag.start + (drag.course.end_section - drag.course.start_section + 1 <= 2 ? 2 : (drag.course.end_section - drag.course.start_section + 1)) + 1}`,
+        }"
+      ></div>
       <button
         v-for="course in displayCourses"
         :key="`${course.id}-${course.adjusted_week || 'regular'}`"
