@@ -1,12 +1,22 @@
-import json
-from fastapi.testclient import TestClient
 import pytest
+from fastapi.testclient import TestClient
+from psycopg import connect as pg_connect
 
 from app.auth import get_current_user
-from app.db import connect
+from app.db import DATABASE_URL, connect
 from app.main import app
 
 client = TestClient(app)
+
+
+def _is_db_available() -> bool:
+    try:
+        with pg_connect(DATABASE_URL, connect_timeout=1) as conn:
+            with conn.cursor() as cur:
+                cur.execute("SELECT 1")
+                return True
+    except Exception:
+        return False
 
 
 def test_parse_text_endpoint_removed():
@@ -15,6 +25,7 @@ def test_parse_text_endpoint_removed():
     assert response.status_code in (404, 405)
 
 
+@pytest.mark.skipif(not _is_db_available(), reason="PostgreSQL not reachable in test environment")
 def test_course_change_logs_flow():
     """验证批量调课、拖拽移动与主动编辑在 course_change_logs 中的记录与查询。"""
     app.dependency_overrides[get_current_user] = lambda: {"id": 9999, "username": "log_test_user"}
@@ -119,5 +130,6 @@ def test_course_change_logs_flow():
         assert len(drag_recs) >= 2
     finally:
         app.dependency_overrides.clear()
-        with connect() as db:
-            db.execute("DELETE FROM users WHERE id=9999")
+        if _is_db_available():
+            with connect() as db:
+                db.execute("DELETE FROM users WHERE id=9999")
