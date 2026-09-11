@@ -22,6 +22,24 @@ def test_distribute_apk_creates_identical_aliases(tmp_path, monkeypatch):
     assert len({release.calc_sha256(path) for path in targets}) == 1
 
 
+def test_distribute_apk_cleans_historical_versions(tmp_path, monkeypatch):
+    source = tmp_path / "signed.apk"
+    source.write_bytes(b"signed-apk-fixture")
+    downloads = tmp_path / "downloads"
+    downloads.mkdir(parents=True)
+    old_file1 = downloads / "序时_v1.0.0.apk"
+    old_file1.write_bytes(b"old-apk")
+    old_file2 = downloads / "时序_v1.0.0.apk"
+    old_file2.write_bytes(b"old-apk")
+    monkeypatch.setattr(release, "STATIC_DOWNLOAD_DIR", str(downloads))
+
+    release.distribute_apk(str(source), "2.0.0")
+
+    assert not old_file1.exists()
+    assert not old_file2.exists()
+    assert (downloads / "序时_v2.0.0.apk").exists()
+
+
 def test_generate_release_notes():
     notes = release.generate_release_notes(
         "1.2.3",

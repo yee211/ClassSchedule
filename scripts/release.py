@@ -244,6 +244,11 @@ def distribute_apk(source: str, version_name: str) -> list[Path]:
                 else:
                     target.unlink(missing_ok=True)
             raise
+    # 清理历史版本带版本号的旧 APK 文件，保持仓库轻量，仅保留当前版本及通用别名
+    for old_file in download_dir.glob("*.apk"):
+        m = re.match(r"^(序时|时序)_v(.+)\.apk$", old_file.name)
+        if m and m.group(2) != version_name:
+            old_file.unlink(missing_ok=True)
     return targets
 
 
