@@ -21,8 +21,22 @@ const props = defineProps({
 
 const emit = defineEmits(['preview-course', 'move-course', 'move-conflict']);
 const gridRef = ref(null);
-const drag = reactive({ active: false, pending: false, course: null, weekday: 1, start: 1, pointerId: null, pointerType: '', x: 0, y: 0 });
+const drag = reactive({
+  active: false,
+  pending: false,
+  settling: false,
+  course: null,
+  weekday: 1,
+  start: 1,
+  pointerId: null,
+  pointerType: '',
+  x: 0,
+  y: 0,
+  dx: 0,
+  dy: 0,
+});
 let holdTimer = null;
+let settleTimer = null;
 let suppressClick = false;
 let dragElement = null;
 
@@ -75,27 +89,28 @@ const displayCourses = computed(() => {
 });
 
 function courseStyle(course) {
-  const isDragging = drag.active && drag.course?.id === course.id;
-  const weekday = isDragging ? drag.weekday : course.weekday;
-  const startSection = isDragging ? drag.start : course.start_section;
+  const isDragging = (drag.active || drag.settling) && drag.course?.id === course.id;
   const span = course.end_section - course.start_section + 1;
   return {
-    gridColumn: `${weekday + 1}`,
-    gridRow: `${startSection + 1}/${startSection + span + 1}`,
+    gridColumn: `${course.weekday + 1}`,
+    gridRow: `${course.start_section + 1}/${course.start_section + span + 1}`,
     '--course': props.colorMap.get(courseKey(course.name)) || '#5B8DEF',
     '--max-lines': span * 4,
+    ...(isDragging ? { transform: `translate3d(${drag.dx}px, ${drag.dy}px, 0) scale(1.04)` } : {}),
   };
 }
 
 function activateDrag(element) {
   drag.pending = false;
   drag.active = true;
+  drag.dx = 0;
+  drag.dy = 0;
   suppressClick = true;
   element?.setPointerCapture?.(drag.pointerId);
-  updateDragTarget(drag.x, drag.y);
 }
 
 function beginDrag(event, course) {
+  if (drag.active || drag.pending || drag.settling) return;
   if (event.button !== undefined && event.button !== 0) return;
   drag.course = course;
   drag.pointerId = event.pointerId;
@@ -105,23 +120,39 @@ function beginDrag(event, course) {
   drag.y = event.clientY;
   drag.weekday = course.weekday;
   drag.start = course.start_section;
+  drag.dx = 0;
+  drag.dy = 0;
+  drag.settling = false;
   drag.pending = true;
   if (drag.pointerType === 'touch') holdTimer = window.setTimeout(() => activateDrag(dragElement), 400);
 }
 
-function updateDragTarget(clientX, clientY) {
+function gridMetrics() {
   const grid = gridRef.value;
-  if (!grid || !drag.course) return;
+  if (!grid) return null;
   const rect = grid.getBoundingClientRect();
   const corner = grid.querySelector('.corner')?.getBoundingClientRect();
   const day = grid.querySelector('.day')?.getBoundingClientRect();
   const leftWidth = corner?.width || 48;
   const headerHeight = day?.height || 46;
-  const dayWidth = (rect.width - leftWidth) / 7;
-  const rowHeight = (rect.height - headerHeight) / maxSections.value;
+  return {
+    rect,
+    leftWidth,
+    headerHeight,
+    dayWidth: (rect.width - leftWidth) / 7,
+    rowHeight: (rect.height - headerHeight) / maxSections.value,
+  };
+}
+
+function updateDragTarget(clientX, clientY) {
+  const metrics = gridMetrics();
+  if (!metrics || !drag.course) return;
+  const { rect, leftWidth, headerHeight, dayWidth, rowHeight } = metrics;
   const duration = drag.course.end_section - drag.course.start_section + 1;
   drag.weekday = Math.max(1, Math.min(7, Math.floor((clientX - rect.left - leftWidth) / dayWidth) + 1));
   drag.start = Math.max(1, Math.min(maxSections.value - duration + 1, Math.floor((clientY - rect.top - headerHeight) / rowHeight) + 1));
+  drag.dx = clientX - drag.x;
+  drag.dy = clientY - drag.y;
 }
 
 function continueDrag(event) {
@@ -144,40 +175,68 @@ function continueDrag(event) {
   }
 }
 
-function finishDrag(event) {
+function resetDrag() {
+  drag.active = false;
+  drag.pending = false;
+  drag.settling = false;
+  drag.course = null;
+  drag.pointerId = null;
+  drag.dx = 0;
+  drag.dy = 0;
+  dragElement = null;
+  window.setTimeout(() => { suppressClick = false; }, 0);
+}
+
+function finishDrag(event, cancelled = false) {
   if (drag.pointerId !== event.pointerId) return;
   window.clearTimeout(holdTimer);
   if (drag.active && drag.course) {
+    const sourceCourse = drag.course;
+    const targetWeekday = drag.weekday;
+    const targetStart = drag.start;
     const duration = drag.course.end_section - drag.course.start_section + 1;
-    const end = drag.start + duration - 1;
-    const conflict = activeCourses.value.some(course => course.id !== drag.course.id
-      && course.weekday === drag.weekday
-      && drag.start <= course.end_section && end >= course.start_section);
-    if (conflict) emit('move-conflict');
-    else if (drag.weekday !== drag.course.weekday || drag.start !== drag.course.start_section) {
-      emit('move-course', { course: drag.course, weekday: drag.weekday, start_section: drag.start, end_section: end });
-    }
+    const end = targetStart + duration - 1;
+    const conflict = activeCourses.value.some(course => course.id !== sourceCourse.id
+      && course.weekday === targetWeekday
+      && targetStart <= course.end_section && end >= course.start_section);
+    const changed = targetWeekday !== sourceCourse.weekday || targetStart !== sourceCourse.start_section;
+    const shouldMove = !cancelled && !conflict && changed;
+    const metrics = gridMetrics();
+    drag.dx = shouldMove && metrics ? (targetWeekday - sourceCourse.weekday) * metrics.dayWidth : 0;
+    drag.dy = shouldMove && metrics ? (targetStart - sourceCourse.start_section) * metrics.rowHeight : 0;
+    drag.active = false;
+    drag.settling = true;
+    window.clearTimeout(settleTimer);
+    settleTimer = window.setTimeout(() => {
+      if (!cancelled && conflict) emit('move-conflict');
+      else if (shouldMove) emit('move-course', {
+        course: sourceCourse,
+        weekday: targetWeekday,
+        start_section: targetStart,
+        end_section: end,
+      });
+      resetDrag();
+    }, 180);
+    return;
   }
-  drag.active = false;
-  drag.pending = false;
-  drag.course = null;
-  drag.pointerId = null;
-  dragElement = null;
-  window.setTimeout(() => { suppressClick = false; }, 0);
+  resetDrag();
 }
 
 function openCourse(course) {
   if (!suppressClick) emit('preview-course', course);
 }
 
-onUnmounted(() => window.clearTimeout(holdTimer));
+onUnmounted(() => {
+  window.clearTimeout(holdTimer);
+  window.clearTimeout(settleTimer);
+});
 </script>
 
 <template>
   <section class="schedule glass" :class="{ busy: loading }" aria-label="每周课程表" tabindex="0">
     <div v-if="loading" class="state">正在读取课表…</div>
     <div v-else-if="!schedule" class="state">还没有课表</div>
-    <div v-else ref="gridRef" class="grid" :class="{ 'is-dragging': drag.active }" :style="gridStyle">
+    <div v-else ref="gridRef" class="grid" :class="{ 'is-dragging': drag.active || drag.settling }" :style="gridStyle">
       <div class="corner">
         <span class="corner-month">{{ weekMonth(schedule.start_date, week) }}</span>
         <span class="corner-label">节次</span>
@@ -210,13 +269,13 @@ onUnmounted(() => window.clearTimeout(holdTimer));
         v-for="course in displayCourses"
         :key="`${course.id}-${course.adjusted_week || 'regular'}`"
         class="course"
-        :class="{ dragging: drag.active && drag.course?.id === course.id }"
+        :class="{ dragging: (drag.active || drag.settling) && drag.course?.id === course.id, settling: drag.settling && drag.course?.id === course.id }"
         :style="courseStyle(course)"
         @click="openCourse(course)"
         @pointerdown="beginDrag($event, course)"
         @pointermove="continueDrag"
         @pointerup="finishDrag"
-        @pointercancel="finishDrag"
+        @pointercancel="finishDrag($event, true)"
         @contextmenu.prevent
       >
         <span class="course-text">

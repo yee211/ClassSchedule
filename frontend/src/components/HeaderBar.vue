@@ -63,6 +63,7 @@ onUnmounted(() => {
             <span>↑ 导入课表</span>
           </label>
           <button type="button" @click="emit('open-adjustments'); courseMenuRef?.removeAttribute('open')">⇄ 调课</button>
+          <button class="danger-menu-item" type="button" :disabled="!schedule" @click="emit('delete-schedule'); courseMenuRef?.removeAttribute('open')">删除当前课表</button>
         </div>
       </details>
       <a
@@ -96,7 +97,6 @@ onUnmounted(() => {
           >
             📱 下载安卓 App (APK)
           </a>
-          <button type="button" :disabled="!schedule" @click="emit('delete-schedule'); userMenuRef?.removeAttribute('open')">删除当前课表</button>
           <button type="button" @click="emit('logout')">退出登录</button>
         </div>
       </details>

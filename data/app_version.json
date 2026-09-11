@@ -1,14 +1,14 @@
 {
-  "versionCode": 11,
-  "versionName": "2.2.1",
+  "versionCode": 12,
+  "versionName": "2.2.2",
   "minVersionCode": 1,
-  "title": "发现新版本 v2.2.1",
+  "title": "发现新版本 v2.2.2",
   "changelog": [
-    "新增图片与自然语言 AI 调课中心",
-    "整合课程设置入口并优化课程统计",
-    "学期支持按开学日期和周数推算结束日期"
+    "课表拖拽交互体验升级，新增平滑过渡动画与手势防误触",
+    "课程操作菜单整合“删除当前课表”快捷项",
+    "优化移动端与窄屏课表布局间距及菜单视觉层次"
   ],
-  "downloadUrl": "https://gh-proxy.com/https://raw.githubusercontent.com/yee211/ClassSchedule/main/static/downloads/%E5%BA%8F%E6%97%B6_v2.2.1.apk",
-  "backupDownloadUrl": "https://api.tanzeng.xyz/downloads/%E5%BA%8F%E6%97%B6_v2.2.1.apk",
+  "downloadUrl": "https://gh-proxy.com/https://raw.githubusercontent.com/yee211/ClassSchedule/main/static/downloads/%E5%BA%8F%E6%97%B6_v2.2.2.apk",
+  "backupDownloadUrl": "https://api.tanzeng.xyz/downloads/%E5%BA%8F%E6%97%B6_v2.2.2.apk",
   "forceUpdate": false
 }
