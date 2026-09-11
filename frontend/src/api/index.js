@@ -150,6 +150,17 @@ export const adjustmentsApi = {
       : undefined;
     return api('/api/adjustments/parse', { method: 'POST', body: form, signal });
   },
+  async parseText(text, scheduleId) {
+    const signal = typeof AbortSignal !== 'undefined' && AbortSignal.timeout
+      ? AbortSignal.timeout(30000)
+      : undefined;
+    return api('/api/adjustments/parse-text', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ schedule_id: scheduleId, text }),
+      signal,
+    });
+  },
   async apply(scheduleId, items) {
     return api('/api/adjustments/apply', {
       method: 'POST',

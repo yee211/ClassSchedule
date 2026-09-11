@@ -13,34 +13,35 @@ const emit = defineEmits([
   'delete-schedule',
   'add-course',
   'upload',
-  'upload-adjustment',
+  'open-adjustments',
   'logout',
   'toggle-night-mode',
   'check-update',
 ]);
 
 const userMenuRef = ref(null);
+const courseMenuRef = ref(null);
 
 function onUpload(event) {
+  courseMenuRef.value?.removeAttribute('open');
   emit('upload', event);
 }
 
-function onAdjustmentUpload(event) {
-  emit('upload-adjustment', event);
-}
-
-function closeUserMenu(event) {
+function closeMenus(event) {
   if (userMenuRef.value && userMenuRef.value.open && !userMenuRef.value.contains(event.target)) {
     userMenuRef.value.removeAttribute('open');
+  }
+  if (courseMenuRef.value && courseMenuRef.value.open && !courseMenuRef.value.contains(event.target)) {
+    courseMenuRef.value.removeAttribute('open');
   }
 }
 
 onMounted(() => {
-  document.addEventListener('click', closeUserMenu);
+  document.addEventListener('click', closeMenus);
 });
 
 onUnmounted(() => {
-  document.removeEventListener('click', closeUserMenu);
+  document.removeEventListener('click', closeMenus);
 });
 </script>
 
@@ -48,41 +49,24 @@ onUnmounted(() => {
   <header class="top glass">
     <div class="brand"><span class="brand-dot"></span><strong>序时</strong></div>
     <div class="top-actions">
-      <button
-        class="header-action uiverse-button"
-        type="button"
-        title="添加课程"
-        @click="emit('add-course')"
-      >
-        <span aria-hidden="true">＋</span>
-        <span class="action-text">添加课程</span>
-        <span class="action-text-short">加课</span>
-      </button>
-      <label class="header-action upload uiverse-button" title="上传课表">
-        <input type="file" accept=".xlsx,.xlsm,.xls" @change="onUpload">
-        <span aria-hidden="true">↑</span>
-        <span class="action-text">上传课表</span>
-        <span class="action-text-short">导入</span>
-      </label>
-      <label class="header-action upload uiverse-button" title="AI 识别调课通知">
-        <input type="file" accept="image/jpeg,image/png,image/webp" @change="onAdjustmentUpload">
-        <span aria-hidden="true">⇄</span>
-        <span class="action-text">调课通知</span>
-        <span class="action-text-short">调课</span>
-      </label>
-      <button
-        v-if="isNative"
-        class="header-action uiverse-button"
-        type="button"
-        title="检查更新"
-        @click="emit('check-update')"
-      >
-        <span aria-hidden="true">🔄</span>
-        <span class="action-text">检查更新</span>
-        <span class="action-text-short">更新</span>
-      </button>
+      <details ref="courseMenuRef" class="course-menu user-menu">
+        <summary class="header-action uiverse-button" title="课程设置">
+          <span aria-hidden="true">☰</span>
+          <span class="action-text">课程设置</span>
+          <span class="action-text-short">课程</span>
+          <span class="user-arrow" aria-hidden="true">⌄</span>
+        </summary>
+        <div class="course-menu-panel user-menu-panel glass">
+          <button type="button" @click="emit('add-course'); courseMenuRef?.removeAttribute('open')">＋ 添加课程</button>
+          <label class="upload">
+            <input type="file" accept=".xlsx,.xlsm,.xls" @change="onUpload">
+            <span>↑ 导入课表</span>
+          </label>
+          <button type="button" @click="emit('open-adjustments'); courseMenuRef?.removeAttribute('open')">⇄ 调课</button>
+        </div>
+      </details>
       <a
-        v-else
+        v-if="!isNative"
         class="header-action uiverse-button download-apk-btn"
         href="/downloads/%E5%BA%8F%E6%97%B6.apk"
         download="序时.apk"

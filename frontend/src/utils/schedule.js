@@ -68,10 +68,11 @@ export function isoDate(date) {
   return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
 }
 
-export function defaultEndDate(startValue) {
+export function defaultEndDate(startValue, weeks = 20) {
   const start = localDate(startValue);
   if (!start) return '';
-  start.setDate(start.getDate() + 20 * 7 - 1);
+  const safeWeeks = Math.max(1, Math.min(30, Number(weeks) || 20));
+  start.setDate(start.getDate() + safeWeeks * 7 - 1);
   return isoDate(start);
 }
 
@@ -116,7 +117,7 @@ export function findCurrentSchedule(schedules) {
 
 export function suggestSemesterDates(termStr) {
   const text = String(termStr || '').trim();
-  const match = text.match(/(\d{4})\s*[-–—/]\s*(\d{4})?[^\d]*([12一二秋春])/);
+  const match = text.match(/(\d{4})\s*[-–—/]\s*(\d{4})[^\d]*(?:第\s*)?([12一二秋春])/);
   if (match) {
     const year1 = Number(match[1]);
     const termType = match[3];
@@ -138,14 +139,6 @@ export function suggestSemesterDates(termStr) {
       const end = new Date(start.getTime() + (20 * 7 - 1) * 86400000);
       return { start: isoDate(start), end: isoDate(end) };
     }
-  }
-
-  const yearMatch = text.match(/(\d{4})/);
-  if (yearMatch) {
-    const y = Number(yearMatch[1]);
-    const start = new Date(y, 8, 1);
-    const end = new Date(start.getTime() + (20 * 7 - 1) * 86400000);
-    return { start: isoDate(start), end: isoDate(end) };
   }
 
   return null;
@@ -223,6 +216,18 @@ export function cleanSectionTime(timeStr) {
 
 export function courseKey(name) {
   return String(name || '未命名课程').trim().replace(/\s+/g, ' ').toLocaleLowerCase();
+}
+
+export function uniqueCourseCount(courses) {
+  return new Set((courses || []).map(course => courseKey(course.name))).size;
+}
+
+export function courseLessonCount(courses, fallbackWeeks = 20) {
+  return (courses || []).reduce((total, course) => {
+    const weekCount = course.weeks?.length || fallbackWeeks;
+    const sectionCount = Math.max(1, (course.end_section || 1) - (course.start_section || 1) + 1);
+    return total + weekCount * Math.ceil(sectionCount / 2);
+  }, 0);
 }
 
 export function buildCourseColorMap(courses) {

@@ -1,4 +1,4 @@
-from app.adjustment_ai import VisionAdjustment, _extract_json
+from app.adjustment_ai import VisionAdjustment, _extract_json, parse_adjustment_text
 from app.routers.adjustments import match_course, normalized, valid_image_signature
 
 
@@ -34,3 +34,15 @@ def test_image_signatures():
     assert valid_image_signature(b"\x89PNG\r\n\x1a\ndata", "image/png")
     assert valid_image_signature(b"RIFF1234WEBPdata", "image/webp")
     assert not valid_image_signature(b"not an image", "image/png")
+
+
+def test_text_parser_uses_shared_ai_request(monkeypatch):
+    captured = {}
+
+    def fake_request(content):
+        captured["content"] = content
+        return [{"week": 3}]
+
+    monkeypatch.setattr("app.adjustment_ai._request_adjustments", fake_request)
+    assert parse_adjustment_text("把第3周高数调到周四") == [{"week": 3}]
+    assert "第3周高数" in captured["content"]

@@ -1,6 +1,12 @@
 <script setup>
 import { computed, onMounted, onUnmounted, ref } from 'vue';
-import { isScheduleActiveToday, weekRange } from '../utils/schedule.js';
+import {
+  courseLessonCount,
+  isScheduleActiveToday,
+  scheduleWeekCount,
+  uniqueCourseCount,
+  weekRange,
+} from '../utils/schedule.js';
 
 const props = defineProps({
   schedules: { type: Array, default: () => [] },
@@ -163,7 +169,9 @@ onUnmounted(() => {
                     {{ item.start_date.slice(0, 10) }} ~ {{ item.end_date.slice(0, 10) }}
                   </span>
                   <span v-else class="term-dates">日期未设置</span>
-                  <span class="term-courses-count">{{ (item.courses || []).length }} 门课程</span>
+                  <span class="term-courses-count">
+                    {{ uniqueCourseCount(item.courses) }} 门课程 · 共 {{ courseLessonCount(item.courses, scheduleWeekCount(item)) }} 节课
+                  </span>
                 </div>
               </div>
               <span v-if="schedule?.id === item.id" class="term-selected-icon">✓</span>

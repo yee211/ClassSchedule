@@ -33,6 +33,7 @@ import CourseEditorModal from './components/CourseEditorModal.vue';
 import CourseAdjustmentModal from './components/CourseAdjustmentModal.vue';
 import AdjustmentImportModal from './components/AdjustmentImportModal.vue';
 import CourseMoveModal from './components/CourseMoveModal.vue';
+import AdjustmentCenterModal from './components/AdjustmentCenterModal.vue';
 import ImporterModal from './components/ImporterModal.vue';
 import SemesterModal from './components/SemesterModal.vue';
 import AuthModal from './components/AuthModal.vue';
@@ -89,6 +90,8 @@ const adjustmentImportItems = ref([]);
 const moveModalOpen = ref(false);
 const pendingMove = ref(null);
 const moveSaving = ref(false);
+const adjustmentCenterOpen = ref(false);
+const adjustmentTextLoading = ref(false);
 
 const importerOpen = ref(false);
 const importing = ref(false);
@@ -110,6 +113,17 @@ const weekOptions = computed(() =>
 );
 
 const courseColorMap = computed(() => buildCourseColorMap(schedule.value?.courses));
+const adjustmentRecords = computed(() => (schedule.value?.courses || []).flatMap(course =>
+  (course.adjustments || []).map(item => ({
+    ...item,
+    course_id: course.id,
+    course_name: course.name,
+    old_weekday: course.weekday,
+    old_start_section: course.start_section,
+    old_end_section: course.end_section,
+    old_room: course.room || '',
+  }))
+).sort((a, b) => a.week - b.week || a.weekday - b.weekday || a.start_section - b.start_section));
 
 // 提示消息
 function notify(text) {
@@ -323,10 +337,9 @@ async function cancelAdjustment() {
   }
 }
 
-async function uploadAdjustmentNotice(event) {
-  const file = event.target.files[0];
-  event.target.value = '';
+async function uploadAdjustmentNotice(file) {
   if (!file || !schedule.value) return;
+  adjustmentCenterOpen.value = false;
   adjustmentImportOpen.value = true;
   adjustmentImportLoading.value = true;
   adjustmentImportFilename.value = file.name;
@@ -340,6 +353,35 @@ async function uploadAdjustmentNotice(event) {
     adjustmentImportError.value = error.message;
   } finally {
     adjustmentImportLoading.value = false;
+  }
+}
+
+async function parseAdjustmentDescription(text) {
+  if (!schedule.value) return;
+  adjustmentTextLoading.value = true;
+  adjustmentImportError.value = '';
+  try {
+    const result = await adjustmentsApi.parseText(text, schedule.value.id);
+    adjustmentCenterOpen.value = false;
+    adjustmentImportOpen.value = true;
+    adjustmentImportFilename.value = '自然语言调课描述';
+    adjustmentImportItems.value = result.items;
+    if (!result.matched) adjustmentImportError.value = '识别成功，但没有记录能与当前课表可靠匹配';
+  } catch (error) {
+    notify(error.message);
+  } finally {
+    adjustmentTextLoading.value = false;
+  }
+}
+
+async function revokeAdjustmentRecord(record) {
+  if (!confirm(`确认撤销“${record.course_name}”第 ${record.week} 周的调课？`)) return;
+  try {
+    await coursesApi.cancelAdjustment(record.course_id, record.week);
+    notify('调课记录已撤销');
+    await load(schedule.value.id);
+  } catch (error) {
+    notify(error.message);
   }
 }
 
@@ -634,7 +676,7 @@ onUnmounted(() => {
       @delete-schedule="deleteSchedule"
       @add-course="openEditor()"
       @upload="upload"
-      @upload-adjustment="uploadAdjustmentNotice"
+      @open-adjustments="adjustmentCenterOpen = true"
       @logout="logout"
       @toggle-night-mode="toggleNightMode"
       @check-update="handleCheckUpdate(false)"
@@ -718,6 +760,16 @@ onUnmounted(() => {
     :items="adjustmentImportItems"
     @close="adjustmentImportOpen = false"
     @apply="applyAdjustmentNotice"
+  />
+
+  <AdjustmentCenterModal
+    :open="adjustmentCenterOpen"
+    :records="adjustmentRecords"
+    :loading="adjustmentTextLoading"
+    @close="adjustmentCenterOpen = false"
+    @image="uploadAdjustmentNotice"
+    @text="parseAdjustmentDescription"
+    @revoke="revokeAdjustmentRecord"
   />
 
   <CourseMoveModal

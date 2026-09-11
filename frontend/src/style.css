@@ -429,6 +429,7 @@ html[data-bg="frosted"] .ambient-canvas {
 .user-menu { position: relative; }
 .user-menu summary { list-style: none; }
 .user-menu summary::-webkit-details-marker { display: none; }
+.course-menu-panel { right: auto; left: 0; width: 180px; }
 .user-badge {
   height: 42px;
   box-sizing: border-box;
@@ -491,6 +492,7 @@ html[data-bg="frosted"] .ambient-canvas {
 }
 .user-menu-panel button,
 .user-menu-panel a,
+.course-menu-panel label,
 .user-menu-link {
   display: block;
   width: 100%;
@@ -507,6 +509,7 @@ html[data-bg="frosted"] .ambient-canvas {
 }
 .user-menu-panel button:hover,
 .user-menu-panel a:hover,
+.course-menu-panel label:hover,
 .user-menu-link:hover { background: rgba(255, 255, 255, 0.35); }
 .user-menu-panel button:disabled { opacity: 0.45; cursor: not-allowed; }
 
@@ -514,9 +517,11 @@ html[data-bg="night"] .user-menu-meta b { color: #f8fafc; }
 html[data-bg="night"] .user-menu-meta small { color: #94a3b8; }
 html[data-bg="night"] .user-menu-panel button,
 html[data-bg="night"] .user-menu-panel a,
+html[data-bg="night"] .course-menu-panel label,
 html[data-bg="night"] .user-menu-link { color: #f1f5f9; }
 html[data-bg="night"] .user-menu-panel button:hover,
 html[data-bg="night"] .user-menu-panel a:hover,
+html[data-bg="night"] .course-menu-panel label:hover,
 html[data-bg="night"] .user-menu-link:hover { background: rgba(255, 255, 255, 0.12); }
 
 .header-action {
@@ -797,6 +802,24 @@ html[data-bg="night"] .user-menu-link:hover { background: rgba(255, 255, 255, 0.
 .move-actions { display: flex; justify-content: flex-end; gap: 10px; margin-top: 20px; }
 .move-actions button { padding: 10px 14px; }
 .move-actions .primary { color: white; background: linear-gradient(135deg, #38bdf8, #6366f1); }
+
+.adjustment-center-modal { width: min(620px, 100%); }
+.adjustment-entry-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; margin-top: 20px; }
+.adjustment-entry { min-height: 150px; padding: 18px 12px; border: 1px solid rgba(255,255,255,.58); border-radius: 18px; background: rgba(255,255,255,.25); color: var(--text-primary); cursor: pointer; box-shadow: inset 0 1px rgba(255,255,255,.65); }
+.adjustment-entry:hover { transform: translateY(-2px); background: rgba(255,255,255,.38); }
+.adjustment-entry > span { display: block; margin-bottom: 10px; color: #0284c7; font-size: 1.7rem; }
+.adjustment-entry b, .adjustment-entry small { display: block; }
+.adjustment-entry small { margin-top: 7px; color: var(--text-secondary); line-height: 1.4; }
+.adjustment-center-modal textarea { width: 100%; box-sizing: border-box; resize: vertical; }
+.adjustment-records { display: grid; gap: 10px; max-height: 62vh; margin-top: 16px; overflow: auto; }
+.adjustment-record { display: grid; grid-template-columns: 1fr auto; gap: 5px 12px; padding: 13px; border: 1px solid rgba(255,255,255,.5); border-radius: 14px; background: rgba(255,255,255,.24); }
+.adjustment-record div { display: flex; justify-content: space-between; grid-column: 1 / -1; gap: 10px; }
+.adjustment-record small { color: var(--text-secondary); }
+.adjustment-record > span, .adjustment-record > strong { grid-column: 1; color: var(--text-primary); font-size: .82rem; }
+.adjustment-record > i { grid-column: 1; color: #38bdf8; font-style: normal; }
+.adjustment-record .danger-link { grid-column: 2; grid-row: 2 / span 3; align-self: center; border: 0; background: none; color: #e11d48; cursor: pointer; }
+.empty-records { padding: 36px 10px; text-align: center; color: var(--text-secondary); }
+@media (max-width: 680px) { .adjustment-entry-grid { grid-template-columns: 1fr; } .adjustment-entry { min-height: 92px; } }
 
 /* 液体光泽扫过（Fluid Sheen）伪元素 */
 .course::before {

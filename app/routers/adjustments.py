@@ -3,7 +3,7 @@ import re
 from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile
 from pydantic import BaseModel, Field
 
-from ..adjustment_ai import parse_adjustment_image
+from ..adjustment_ai import parse_adjustment_image, parse_adjustment_text
 from ..auth import get_current_user
 from ..db import connect
 from ..settings import settings
@@ -62,6 +62,25 @@ class ApplyRequest(BaseModel):
     items: list[ApplyItem] = Field(min_length=1, max_length=100)
 
 
+class TextParseRequest(BaseModel):
+    schedule_id: int
+    text: str = Field(min_length=5, max_length=4000)
+
+
+def match_extracted(schedule_id: int, user_id: int, extracted: list[dict]):
+    with connect() as db:
+        if not db.execute("SELECT 1 FROM schedules WHERE id=%s AND user_id=%s", (schedule_id, user_id)).fetchone():
+            raise HTTPException(404, "课表不存在")
+        courses = db.execute("SELECT * FROM courses WHERE schedule_id=%s", (schedule_id,)).fetchall()
+    results = []
+    for item in extracted:
+        course, count = match_course(courses, item)
+        status = "matched" if course else ("ambiguous" if count > 1 else "unmatched")
+        results.append({**item, "status": status, "course_id": course["id"] if course else None,
+                        "matched_course_name": course["name"] if course else "", "selected": bool(course)})
+    return {"items": results, "matched": sum(row["status"] == "matched" for row in results), "total": len(results)}
+
+
 @router.post("/parse")
 def parse_notice(file: UploadFile = File(...), schedule_id: int = Form(...), user=Depends(get_current_user)):
     if file.content_type not in IMAGE_TYPES:
@@ -77,17 +96,16 @@ def parse_notice(file: UploadFile = File(...), schedule_id: int = Form(...), use
         extracted = parse_adjustment_image(content, file.content_type)
     except RuntimeError as error:
         raise HTTPException(422, str(error)) from error
-    with connect() as db:
-        if not db.execute("SELECT 1 FROM schedules WHERE id=%s AND user_id=%s", (schedule_id, user["id"])).fetchone():
-            raise HTTPException(404, "课表不存在")
-        courses = db.execute("SELECT * FROM courses WHERE schedule_id=%s", (schedule_id,)).fetchall()
-    results = []
-    for item in extracted:
-        course, count = match_course(courses, item)
-        status = "matched" if course else ("ambiguous" if count > 1 else "unmatched")
-        results.append({**item, "status": status, "course_id": course["id"] if course else None,
-                        "matched_course_name": course["name"] if course else "", "selected": bool(course)})
-    return {"items": results, "matched": sum(row["status"] == "matched" for row in results), "total": len(results)}
+    return match_extracted(schedule_id, user["id"], extracted)
+
+
+@router.post("/parse-text")
+def parse_text_notice(payload: TextParseRequest, user=Depends(get_current_user)):
+    try:
+        extracted = parse_adjustment_text(payload.text.strip())
+    except RuntimeError as error:
+        raise HTTPException(422, str(error)) from error
+    return match_extracted(payload.schedule_id, user["id"], extracted)
 
 
 @router.post("/apply")

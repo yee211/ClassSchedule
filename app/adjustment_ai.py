@@ -19,7 +19,7 @@ VISION_TIMEOUT = min(60.0, max(5.0, float(os.getenv("VISION_TIMEOUT_SECONDS", "2
 VISION_MAX_OUTPUT_TOKENS = min(8000, max(500, int(os.getenv("VISION_MAX_OUTPUT_TOKENS", "2000"))))
 VISION_ENABLE_THINKING = os.getenv("VISION_ENABLE_THINKING", "false").lower() == "true"
 
-PROMPT = """你是高校调课通知结构化提取器。阅读图片中的调课通知，将每一条“调整前”与对应的“调整后”配对。
+PROMPT = """你是高校调课通知结构化提取器。阅读用户提供的图片或自然语言，将每一条“调整前”与对应的“调整后”配对。
 只输出 JSON，不要解释，不要 Markdown。格式：
 {"adjustments":[{"course_name":"课程全名","teacher":"教师","week":2,
 "old_weekday":1,"old_start_section":1,"old_end_section":2,"old_room":"北201",
@@ -62,10 +62,9 @@ def _extract_json(text: str) -> str:
     return text[start:end + 1] if start != -1 and end > start else text
 
 
-def parse_adjustment_image(content: bytes, mime_type: str) -> list[dict]:
+def _request_adjustments(user_content) -> list[dict]:
     if not VISION_API_KEY:
         raise RuntimeError("视觉模型尚未配置 VISION_API_KEY")
-    image_url = f"data:{mime_type};base64,{base64.b64encode(content).decode('ascii')}"
     try:
         response = httpx.post(
             f"{VISION_BASE_URL}/chat/completions",
@@ -77,10 +76,7 @@ def parse_adjustment_image(content: bytes, mime_type: str) -> list[dict]:
                 "max_tokens": VISION_MAX_OUTPUT_TOKENS,
                 "enable_thinking": VISION_ENABLE_THINKING,
                 "response_format": {"type": "json_object"},
-                "messages": [{"role": "user", "content": [
-                    {"type": "text", "text": PROMPT},
-                    {"type": "image_url", "image_url": {"url": image_url}},
-                ]}],
+                "messages": [{"role": "user", "content": user_content}],
             },
         )
         response.raise_for_status()
@@ -103,3 +99,15 @@ def parse_adjustment_image(content: bytes, mime_type: str) -> list[dict]:
     if not rows:
         raise RuntimeError("没有从通知中识别到有效调课记录")
     return rows
+
+
+def parse_adjustment_image(content: bytes, mime_type: str) -> list[dict]:
+    image_url = f"data:{mime_type};base64,{base64.b64encode(content).decode('ascii')}"
+    return _request_adjustments([
+        {"type": "text", "text": PROMPT},
+        {"type": "image_url", "image_url": {"url": image_url}},
+    ])
+
+
+def parse_adjustment_text(description: str) -> list[dict]:
+    return _request_adjustments(f"{PROMPT}\n\n用户的调课描述：\n{description}")
