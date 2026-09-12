@@ -45,6 +45,4 @@ yarn-error.log*
 .DS_Store
 Thumbs.db
 .agents/*
-!.agents/skills/
-.agents/skills/app-version-release/
 
