@@ -1,14 +1,14 @@
 {
-  "versionCode": 17,
-  "versionName": "2.2.7",
+  "versionCode": 18,
+  "versionName": "2.2.8",
   "minVersionCode": 1,
-  "title": "发现新版本 v2.2.7",
+  "title": "发现新版本 v2.2.8",
   "changelog": [
-    "导入课表保留为只读原始版，首次修改自动创建学期（调）版本",
-    "修复整学期拖拽历史回滚被误判为单周调课的问题",
-    "完善调课周次、课程输入与异常登录凭证校验"
+    "调课通知记录按课程分组展示，课程名称完整显示，支持收起/展开详情",
+    "记录删除由左滑手势改为按钮操作，撤销入口更直观",
+    "修复未登录时更新弹窗与登录弹窗重叠的问题"
   ],
-  "downloadUrl": "https://gh-proxy.com/https://raw.githubusercontent.com/yee211/ClassSchedule/main/static/downloads/%E5%BA%8F%E6%97%B6_v2.2.7.apk",
-  "backupDownloadUrl": "https://api.tanzeng.xyz/downloads/%E5%BA%8F%E6%97%B6_v2.2.7.apk",
+  "downloadUrl": "https://gh-proxy.com/https://raw.githubusercontent.com/yee211/ClassSchedule/main/static/downloads/%E5%BA%8F%E6%97%B6_v2.2.8.apk",
+  "backupDownloadUrl": "https://api.tanzeng.xyz/downloads/%E5%BA%8F%E6%97%B6_v2.2.8.apk",
   "forceUpdate": false
 }

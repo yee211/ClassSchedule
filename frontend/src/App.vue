@@ -98,6 +98,8 @@ const message = ref('');
 // 应用更新状态
 const updateModalOpen = ref(false);
 const updateInfo = ref({});
+// 未登录时不弹更新弹窗（避免与登录弹窗重叠），登录成功后再弹出
+const pendingUpdateAfterLogin = ref(false);
 
 // 用户认证状态
 const user = ref(null);
@@ -234,6 +236,13 @@ async function submitAuth() {
     authForm.password = '';
     await load();
     notify(isRegister ? '注册成功，欢迎加入' : '欢迎回来');
+    // 登录前若已发现新版本，待登录弹窗关闭后再弹出更新
+    if (pendingUpdateAfterLogin.value) {
+      pendingUpdateAfterLogin.value = false;
+      setTimeout(() => {
+        updateModalOpen.value = true;
+      }, 600);
+    }
   } catch (error) {
     authError.value = error.message;
   } finally {
@@ -838,7 +847,14 @@ async function handleCheckUpdate(silent = false) {
     const result = await checkAppUpdate(silent);
     if (result.hasUpdate) {
       updateInfo.value = result.updateInfo;
-      updateModalOpen.value = true;
+      if (user.value) {
+        updateModalOpen.value = true;
+      } else {
+        pendingUpdateAfterLogin.value = true;
+        if (!silent) {
+          notify(`发现新版本 v${result.updateInfo?.versionName || ''}，登录后自动弹出更新`);
+        }
+      }
     } else if (!silent) {
       notify(`当前已是最新版本 (v${CURRENT_VERSION_NAME})`);
     }
@@ -867,9 +883,6 @@ function onIgnoreUpdate() {
 onMounted(async () => {
   document.documentElement.setAttribute('data-bg', bgMode.value);
   window.addEventListener('auth:expired', logout);
-  if (isNative.value) {
-    handleCheckUpdate(true);
-  }
   if (getToken()) {
     try {
       user.value = await authApi.me();
@@ -879,6 +892,10 @@ onMounted(async () => {
     }
   } else {
     loading.value = false;
+  }
+  // 更新检查放在登录态恢复之后，未登录时只记录不弹窗，避免与登录弹窗重叠
+  if (isNative.value) {
+    handleCheckUpdate(true);
   }
 });
 
